@@ -29,6 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -132,14 +133,22 @@ fun SyncSettingsPage(nav: SettingsNav) {
                 onBack = if (isRoot) null else nav::pop,
                 leading = if (isRoot) ({ SetupCloseButton(nav) }) else null,
             )
+            val pullState = rememberPullToRefreshState()
             PullToRefreshBox(
                 isRefreshing = refreshing,
+                state = pullState,
                 onRefresh = {
-                    if (!state.isEnabled) return@PullToRefreshBox
+                    if (!state.isEnabled) {
+                        scope.launch { pullState.animateToHidden() }
+                        return@PullToRefreshBox
+                    }
                     refreshing = true
                     scope.launch {
-                        model.syncNow()
-                        refreshing = false
+                        try {
+                            model.syncNow()
+                        } finally {
+                            refreshing = false
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxSize(),

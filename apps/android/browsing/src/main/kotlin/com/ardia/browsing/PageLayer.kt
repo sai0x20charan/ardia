@@ -78,6 +78,8 @@ import com.ardia.design.semibold
 import com.ardia.store.BrowserTab
 import com.ardia.store.SwipeNavigationMode
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -103,6 +105,7 @@ internal class PageGestures(private val scope: CoroutineScope) {
     var isRefreshing: Boolean by mutableStateOf(false)
         private set
     var widthPx: Float = 0f
+    private var pullJob: Job? = null
 
     fun beginSwipe(direction: SwipeDirection) {
         this.direction = direction
@@ -134,33 +137,62 @@ internal class PageGestures(private val scope: CoroutineScope) {
     }
 
     fun followPull(pulledDp: Float) {
+        pullJob?.cancel()
+        pullJob = null
         pull = PullToRefreshRules.distance(pulledDp)
     }
 
-    fun finishPull(page: Page) {
-        val triggered = PullToRefreshRules.triggers(pull)
-        scope.launch {
-            if (triggered) {
-                isRefreshing = true
-                page.reload()
-                animatePull(REFRESH_HOLD_DP)
-                withTimeoutOrNull(REFRESH_TIMEOUT_MILLIS) {
-                    page.state.first { it.isLoading }
-                    page.state.first { !it.isLoading }
+    fun finishPull(page: Page, allowTrigger: Boolean = true) {
+        val triggered = allowTrigger && PullToRefreshRules.triggers(pull)
+        pullJob?.cancel()
+        pullJob = scope.launch {
+            try {
+                if (triggered) {
+                    isRefreshing = true
+                    var sawLoading = page.state.value.isLoading
+                    val loadJob = launch(start = CoroutineStart.UNDISPATCHED) {
+                        withTimeoutOrNull(REFRESH_TIMEOUT_MILLIS) {
+                            if (!sawLoading) {
+                                withTimeoutOrNull(LOAD_START_TIMEOUT_MILLIS) {
+                                    page.state.first { it.isLoading }
+                                    sawLoading = true
+                                }
+                            }
+                            if (sawLoading) {
+                                page.state.first { !it.isLoading }
+                            }
+                        }
+                    }
+                    page.reload()
+                    val holdJob = launch { animatePull(REFRESH_HOLD_DP) }
+                    loadJob.join()
+                    holdJob.cancel()
                 }
                 isRefreshing = false
+                animatePull(0f)
+            } finally {
+                isRefreshing = false
             }
-            animatePull(0f)
         }
     }
 
+    fun cancel() {
+        pullJob?.cancel()
+        pullJob = null
+        isRefreshing = false
+        pull = 0f
+    }
+
     private suspend fun animatePull(to: Float) {
+        if (pull == to) return
         val motion = Animatable(pull)
         motion.animateTo(to, Motion.snappy.spec()) { pull = value }
+        pull = to
     }
 
     companion object {
         const val REFRESH_HOLD_DP = 56f
+        const val LOAD_START_TIMEOUT_MILLIS = 800L
         const val REFRESH_TIMEOUT_MILLIS = 8_000L
     }
 }
@@ -256,7 +288,7 @@ internal fun Modifier.pageGestures(
                             gestures.finishSwipe(ended && SwipeNavigationRules.commits(signed, signedVelocity, commit, flick), page)
                         }
                     }
-                    PageDrag.Pull -> gestures.finishPull(page)
+                    PageDrag.Pull -> gestures.finishPull(page, allowTrigger = ended)
                     PageDrag.Undecided -> Unit
                 }
             }
@@ -344,6 +376,9 @@ internal fun PageContent(
     val surface = ArdiaThemeState.look.surface.current
     val scope = rememberCoroutineScope()
     val gestures = remember(tab.id) { PageGestures(scope) }
+    DisposableEffect(gestures) {
+        onDispose { gestures.cancel() }
+    }
     val view = LocalView.current
     Box(modifier.testTag(BrowsingTags.PAGE)) {
         if (page != null) {

@@ -117,8 +117,11 @@ fun FilterListsPage(nav: SettingsNav) {
                 onRefresh = {
                     refreshing = true
                     scope.launch {
-                        model.updateFilterListsNow()
-                        refreshing = false
+                        try {
+                            model.updateFilterListsNow()
+                        } finally {
+                            refreshing = false
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxSize(),
