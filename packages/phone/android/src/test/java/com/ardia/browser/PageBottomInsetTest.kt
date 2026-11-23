@@ -10,6 +10,7 @@ class PageBottomInsetTest {
         assertTrue(start.contains("window.__ardiaSetBottomInset(96.00,840.50,true)"))
         assertTrue(start.contains("scroll-padding-bottom"))
         assertTrue(start.contains("backdrop-filter"))
+        assertTrue(start.contains("__ardia_bottom_apron"))
         assertTrue(start.contains("elementsFromPoint"))
 
         val update = PageBottomInset.updateCall(-12.0, 800.0, blurEnabled = false)

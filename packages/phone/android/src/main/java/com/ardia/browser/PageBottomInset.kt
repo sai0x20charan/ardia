@@ -12,6 +12,7 @@ internal object PageBottomInset {
   if (window !== window.top) return;
   const STYLE_ID = "__ardia_bottom_inset_style";
   const BLUR_ID = "__ardia_bottom_blur";
+  const APRON_ID = "__ardia_bottom_apron";
   const state = window.__ardiaBottomInset || (window.__ardiaBottomInset = {
     insetDp: 0,
     viewHeightDp: 0,
@@ -49,11 +50,65 @@ internal object PageBottomInset {
     el.style.setProperty("backdrop-filter", filter, "important");
   };
 
-  const ensureBlur = (px) => {
+  const parseAlpha = (color) => {
+    if (!color || color === "transparent") return 0;
+    const match = /^rgba?\(([^)]+)\)$/i.exec(color.trim());
+    if (!match) return 1;
+    const parts = match[1].split(/[,\s/]+/).filter(Boolean);
+    if (parts.length < 4) return 1;
+    const alpha = parseFloat(parts[3]);
+    return isFinite(alpha) ? alpha : 0;
+  };
+
+  const findBarBackground = (el, minWidth) => {
+    let current = el;
+    for (let depth = 0; depth < 3 && current; depth++) {
+      const bg = getComputedStyle(current).backgroundColor;
+      if (parseAlpha(bg) >= 0.75) return bg;
+      let next = null;
+      for (let i = 0; i < current.children.length; i++) {
+        const child = current.children[i];
+        if (child.getBoundingClientRect().width >= minWidth) {
+          next = child;
+          break;
+        }
+      }
+      current = next;
+    }
+    return null;
+  };
+
+  const ensureApron = (px, color) => {
+    const root = document.documentElement;
+    if (!root) return;
+    let apron = document.getElementById(APRON_ID);
+    if (!color || px <= 0) {
+      if (apron) apron.remove();
+      return;
+    }
+    if (!apron) {
+      apron = document.createElement("div");
+      apron.id = APRON_ID;
+      apron.setAttribute("aria-hidden", "true");
+      apron.style.setProperty("position", "fixed", "important");
+      apron.style.setProperty("left", "0", "important");
+      apron.style.setProperty("right", "0", "important");
+      apron.style.setProperty("bottom", "0", "important");
+      apron.style.setProperty("pointer-events", "none", "important");
+      apron.style.setProperty("z-index", "2147483646", "important");
+      root.appendChild(apron);
+    } else if (apron.parentNode !== root) {
+      root.appendChild(apron);
+    }
+    apron.style.setProperty("height", (px + 1) + "px", "important");
+    apron.style.setProperty("background-color", color, "important");
+  };
+
+  const ensureBlur = (px, apronActive) => {
     const root = document.documentElement;
     if (!root) return;
     let host = document.getElementById(BLUR_ID);
-    if (!state.blurEnabled || px <= 0) {
+    if (!state.blurEnabled || px <= 0 || apronActive) {
       if (host) host.remove();
       return;
     }
@@ -170,7 +225,7 @@ internal object PageBottomInset {
           let node = hits[i];
           while (node && node !== document.body && node !== document.documentElement && !visited.has(node)) {
             visited.add(node);
-            if (node.nodeType === 1 && node.id !== BLUR_ID) {
+            if (node.nodeType === 1 && node.id !== BLUR_ID && node.id !== APRON_ID) {
               const pos = getComputedStyle(node).position;
               if (pos === "fixed") candidates.add(node);
             }
@@ -185,12 +240,14 @@ internal object PageBottomInset {
   const applyFixed = (px) => {
     if (px <= 0) {
       for (const [el, entry] of Array.from(state.lifted.entries())) restoreElement(el, entry);
-      return;
+      return null;
     }
     const candidates = collectFixedCandidates(px);
+    const width = window.innerWidth;
     const height = window.innerHeight;
+    let apronColor = null;
     for (const el of candidates) {
-      if (el.id === BLUR_ID) continue;
+      if (el.id === BLUR_ID || el.id === APRON_ID) continue;
       const existing = state.lifted.get(el);
       const style = getComputedStyle(el);
       if (style.position !== "fixed" || style.display === "none" || style.visibility === "hidden" || parseFloat(style.opacity) === 0 || style.bottom === "auto") {
@@ -238,7 +295,11 @@ internal object PageBottomInset {
         entry.shift = px;
         state.lifted.set(el, entry);
       }
+      if (!apronColor && baseBottom <= 8 && rect.width >= width * 0.9) {
+        apronColor = findBarBackground(el, width * 0.9);
+      }
     }
+    return apronColor;
   };
 
   const applyAll = () => {
@@ -257,8 +318,9 @@ internal object PageBottomInset {
         }
       }
       applyBody(px);
-      applyFixed(px);
-      ensureBlur(px);
+      const apronColor = applyFixed(px);
+      ensureApron(px, apronColor);
+      ensureBlur(px, Boolean(apronColor));
     } catch (_) {}
   };
 
