@@ -66,17 +66,16 @@ export const tabCountLabel = (count: number) => (count > MAX_COUNT ? `${MAX_COUN
 
 export function MaterialBottomBar(props: MaterialBottomBarProps) {
   const { scheme, container } = props;
-  const transparent = !props.isStart && !props.isTabOverview && !props.addressDocked;
   return (
-    <MaterialBottomBarSurface scheme={scheme} container={container} transparent={transparent}>
+    <MaterialBottomBarSurface scheme={scheme} container={container}>
       {props.isStart ? <StartControls {...props} /> : props.isTabOverview ? <OverviewControls {...props} /> : <PageControls {...props} />}
     </MaterialBottomBarSurface>
   );
 }
 
-export function MaterialBottomBarSurface({ scheme, container, transparent = false, children }: { scheme: MaterialScheme; container?: ComponentProps<typeof Animated.View>; transparent?: boolean; children: ReactNode }) {
+export function MaterialBottomBarSurface({ scheme, container, children }: { scheme: MaterialScheme; container?: ComponentProps<typeof Animated.View>; children: ReactNode }) {
   return (
-    <Animated.View {...container} style={[styles.row, transparent ? styles.transparentRow : { backgroundColor: scheme.surfaceContainer }, container?.style]}>
+    <Animated.View {...container} style={[styles.row, { backgroundColor: scheme.surfaceContainer }, container?.style]}>
       {children}
     </Animated.View>
   );
@@ -280,7 +279,6 @@ export function MaterialBarIconButton({ testID, icon, label, hint, scheme, turne
 }
 
 const styles = StyleSheet.create({
-  transparentRow: { backgroundColor: "transparent", elevation: 0 },
   row: { flexDirection: "row", alignItems: "center", gap: materialBottomBar.gap, paddingHorizontal: materialBottomBar.pad, height: materialBottomBar.height, borderRadius: materialShape.full, elevation: 3 },
   fieldContainer: { flex: 1, height: materialBottomBar.field, borderRadius: materialShape.full, overflow: "hidden" },
   fieldPressable: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 12, paddingRight: 4 },
