@@ -169,6 +169,16 @@ internal object PageBottomInset {
     state.lifted.delete(el);
   };
 
+  const isTransparentFullOverlay = (el, style, rect, height) => {
+    if (rect.height < height * 0.75) return false;
+    if (style.position !== "fixed" && style.position !== "absolute") return false;
+    if (style.bottom === "auto") return false;
+    const bg = parseRgba(style.backgroundColor);
+    if (bg && bg.a >= 0.1) return false;
+    if (el.querySelector && el.querySelector("video, iframe")) return false;
+    return true;
+  };
+
   const isBottomOverlay = (el, style, height) => {
     if (style.position === "fixed") return true;
     if (style.position !== "absolute" || style.bottom === "auto") return false;
@@ -233,7 +243,8 @@ internal object PageBottomInset {
       }
       const rect = el.getBoundingClientRect();
       const maxHeight = rect.width < width * 0.35 ? height * 0.6 : height * 0.45;
-      if (rect.width <= 0 || rect.height <= 0 || rect.height >= maxHeight) {
+      const fullOverlay = isTransparentFullOverlay(el, style, rect, height);
+      if (rect.width <= 0 || rect.height <= 0 || (!fullOverlay && rect.height >= maxHeight)) {
         if (existing) restoreElement(el, existing);
         continue;
       }
