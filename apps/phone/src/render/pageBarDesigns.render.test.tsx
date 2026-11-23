@@ -117,7 +117,7 @@ test("the redesigned bar clears the WebView on Android, overlays the page on iPh
   const view = root.root.findAll((node) => node.props.pageId !== undefined && node.props.obscuredInsets !== undefined)[0]!;
   expect(view.props.obscuredInsets).toEqual({ top: 47, bottom: android ? 90 : 75 });
   expect(view.props.toneInsets).toEqual({ top: 0, bottom: android ? 0 : 75 });
-  expect(view.props.blurBottomEdge).toBe(android);
+  expect(view.props.bottomBlurNavigationInset).toBe(android ? 34 : undefined);
   expect(StyleSheet.flatten(host(root, "pageArea")!.props.style).marginBottom).toBe(0);
   const strip = StyleSheet.flatten(host(root, "pageStatusStrip")!.props.style);
   expect(strip).toMatchObject({ position: "absolute", top: 0, left: 0, right: 0, height: 47 });
@@ -158,12 +158,12 @@ test("Android clears the toolbar and pill and drops the blur when the toolbar is
   scrolled("down");
   expect(bottom(root)).toBe(android ? 79 : 75);
   expect(pageView(root).props.bottomInsetTransitionMs).toBe(android ? 300 : undefined);
-  expect(pageView(root).props.blurBottomEdge).toBe(android);
+  expect(pageView(root).props.bottomBlurNavigationInset).toBe(android ? 34 : undefined);
   scrolled("up");
   expect(bottom(root)).toBe(android ? 90 : 75);
   act(() => storeFullscreen(tab.id, true));
   expect(bottom(root)).toBe(android ? 0 : 75);
-  expect(pageView(root).props.blurBottomEdge).toBe(false);
+  expect(pageView(root).props.bottomBlurNavigationInset).toBeUndefined();
   act(() => storeFullscreen(tab.id, false));
   act(() => usePageUi.setState({ findOpen: true }));
   expect(bottom(root)).toBe(android ? 0 : 75);

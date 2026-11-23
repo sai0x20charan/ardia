@@ -24,15 +24,21 @@ internal class PageBottomBlur(density: Float) {
     private val mask = Paint().apply { blendMode = BlendMode.DST_IN }
     private var maskEdge = -1
     private var maskTop = -1
+    private var navigationTop = -1
+    private var fadeBottom = -1
 
     fun clear() = node.discardDisplayList()
 
-    fun draw(canvas: Canvas, width: Int, pageTop: Int, pageEdge: Int, bandHeight: Int, drawPage: (Canvas) -> Unit) {
+    fun draw(canvas: Canvas, width: Int, pageTop: Int, pageEdge: Int, bandHeight: Int, navigationInset: Int, drawPage: (Canvas) -> Unit) {
         val transitionTop = maxOf(pageTop, pageEdge - feather)
         if (transitionTop >= pageEdge) return
         val bottom = pageEdge + bandHeight
+        val navTop = maxOf(pageEdge, bottom - navigationInset)
+        val blurBottom = minOf(bottom, navTop + minOf(feather, navigationInset / 3))
+        val fadesIntoNavigation = blurBottom > navTop
+        val visibleBottom = if (fadesIntoNavigation) blurBottom else bottom
         val recordingTop = maxOf(pageTop, transitionTop - padding)
-        val recordingBottom = minOf(bottom + padding, pageEdge + (pageEdge - pageTop))
+        val recordingBottom = minOf(visibleBottom + padding, pageEdge + (pageEdge - pageTop))
         val recordingHeight = ceil((recordingBottom - recordingTop) / scale).toInt()
         val recordingWidth = ceil(width / scale).toInt()
         node.setPosition(0, 0, recordingWidth, recordingHeight)
@@ -53,13 +59,27 @@ internal class PageBottomBlur(density: Float) {
         }
         LookActivity.blurLayerRenders += 1
 
-        if (maskEdge != pageEdge || maskTop != transitionTop) {
+        if (maskEdge != pageEdge || maskTop != transitionTop || navigationTop != navTop || fadeBottom != blurBottom) {
             maskEdge = pageEdge
             maskTop = transitionTop
-            mask.shader = LinearGradient(0f, transitionTop.toFloat(), 0f, pageEdge.toFloat(),
-                intArrayOf(Color.TRANSPARENT, 0x40000000, Color.BLACK), floatArrayOf(0f, 0.65f, 1f), Shader.TileMode.CLAMP)
+            navigationTop = navTop
+            fadeBottom = blurBottom
+            val gradientBottom = if (fadesIntoNavigation) blurBottom else pageEdge
+            val span = (gradientBottom - transitionTop).toFloat()
+            val featherStop = (pageEdge - transitionTop) / span
+            val colours = if (fadesIntoNavigation) {
+                intArrayOf(Color.TRANSPARENT, 0x40000000, Color.BLACK, Color.BLACK, Color.TRANSPARENT)
+            } else {
+                intArrayOf(Color.TRANSPARENT, 0x40000000, Color.BLACK)
+            }
+            val stops = if (fadesIntoNavigation) {
+                floatArrayOf(0f, featherStop * 0.65f, featherStop, (navTop - transitionTop) / span, 1f)
+            } else {
+                floatArrayOf(0f, 0.65f, 1f)
+            }
+            mask.shader = LinearGradient(0f, transitionTop.toFloat(), 0f, gradientBottom.toFloat(), colours, stops, Shader.TileMode.CLAMP)
         }
-        val drawBottom = minOf(bottom, recordingBottom)
+        val drawBottom = minOf(visibleBottom, recordingBottom)
         val layer = canvas.saveLayer(0f, transitionTop.toFloat(), width.toFloat(), drawBottom.toFloat(), null)
         val position = canvas.save()
         canvas.translate(0f, recordingTop.toFloat())

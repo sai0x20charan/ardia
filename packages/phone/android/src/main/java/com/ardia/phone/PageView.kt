@@ -3,6 +3,7 @@ package com.ardia.phone
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.os.Build
 import android.os.SystemClock
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
@@ -41,11 +42,11 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
     private val host = FrameLayout(context)
     private var bottomBlur: PageBottomBlur? = null
     private var hostAtRest = true
-    var blurBottomEdge = false
+    var bottomBlurNavigationInset: Float? = null
         set(value) {
             if (field == value) return
             field = value
-            if (!value) clearBottomBlur()
+            if (value == null) clearBottomBlur()
             invalidate()
         }
     private var scope: CoroutineScope? = null
@@ -177,7 +178,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
         },
     ) {
         cover.pageDrawn()
-        if (blurBottomEdge) invalidate()
+        if (bottomBlurNavigationInset != null) invalidate()
         lab { "page view ${page?.id ?: pageId} drawn ${SystemClock.uptimeMillis() - drawnAskedAt} ms after it became visible" }
         onPageEvent(mapOf("name" to "drawn"))
     }
@@ -238,7 +239,8 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
     }
 
     private fun drawBottomBlur(canvas: Canvas, bandHeight: Int) {
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S || !blurBottomEdge ||
+        val navigationInset = bottomBlurNavigationInset
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || navigationInset == null ||
             !canvas.isHardwareAccelerated || bandHeight <= 0 || !hostAtRest || width <= 0 ||
             drawn.stage != PageDrawnWatch.Stage.Drawn || summaryLayer?.visibility == View.VISIBLE ||
             LookBudget.isDegraded(context) || host.childCount == 0 || page?.view?.value?.parent !== host
@@ -249,7 +251,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
         val density = resources.displayMetrics.density
         val blur = bottomBlur ?: PageBottomBlur(density).also { bottomBlur = it }
         val time = drawingTime
-        blur.draw(canvas, width, host.top, host.bottom, bandHeight) { recording ->
+        blur.draw(canvas, width, host.top, host.bottom, bandHeight, (navigationInset * density).roundToInt()) { recording ->
             drawChild(recording, host, time)
         }
     }
@@ -336,7 +338,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
         val atRest = host.translationX == 0f && host.translationY == 0f
         if (hostAtRest != atRest) {
             hostAtRest = atRest
-            if (blurBottomEdge) invalidate()
+            if (bottomBlurNavigationInset != null) invalidate()
         }
         true
     }
@@ -517,7 +519,10 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
 
     override fun onVisibilityChanged(changedView: View, visibility: Int) {
         super.onVisibilityChanged(changedView, visibility)
-        if (!isShown) dismissSummary(animated = false)
+        if (!isShown) {
+            clearBottomBlur()
+            dismissSummary(animated = false)
+        }
     }
 
     private fun documentChanged(generation: Long) {

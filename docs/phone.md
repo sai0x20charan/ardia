@@ -2610,8 +2610,8 @@ Not audited at all: Compose's `SyncSetupContent` internals inside onboarding.
     viewport once scrolling settles. Fullscreen and search clear the browsing toolbar inset.
   - **The lower edge on Android:** a live blur of the adjacent WebView extends into the sides and below the toolbar.
     It feathers in over the last 12 dp of the page and uses the reflected page edge to fill the space beyond the
-    viewport. Before the first web frame, with reduced transparency, or on a constrained device, the area uses the
-    page's sampled bottom tone. The controls keep their own surfaces. The existing `bottom_bar_collapses` count
+    viewport. It fades into the sampled tone near Android's navigation buttons to preserve icon contrast. Before
+    the first web frame, with reduced transparency, or on a constrained device, the area uses that tone throughout. The controls keep their own surfaces. The existing `bottom_bar_collapses` count
     tracks fold use. The lab's `blurLayerRenders` counter includes the page edge for rendering cost checks.
   - Both platforms receive `obscuredInsets` and `toneInsets`. Android's `PageView` lays out the WebView between
     the bands, samples tone at its visible edge, and includes the bands' colours when composing deck snapshots.
