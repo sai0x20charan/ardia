@@ -1,4 +1,4 @@
-import { memo, useEffect, useState, type ReactNode } from "react";
+import { memo, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { countRender } from "../../state/app/interactionPerf";
 import { Platform, StyleSheet, useWindowDimensions, View, type LayoutChangeEvent } from "react-native";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
@@ -42,7 +42,7 @@ function AtCardScale({ cardWidth, box, children }: { cardWidth: number | null; b
   return <View testID="pageCoverCardFace" style={[styles.cardFace, { width: cardWidth, height: box.height / scale, transform: [{ scale }] }]}>{children}</View>;
 }
 
-export const PageCover = memo(function PageCover({ tab }: { tab: BrowserTab }) {
+export const PageCover = memo(function PageCover({ tab, onShownChange }: { tab: BrowserTab; onShownChange?: (shown: boolean) => void }) {
   countRender("PageCover");
   const theme = useTheme();
   const tone = usePageTone(tab.id);
@@ -55,6 +55,7 @@ export const PageCover = memo(function PageCover({ tab }: { tab: BrowserTab }) {
   const [box, setBox] = useState<Box>(() => ({ width: window.width, height: window.height }));
   const laidOut = ({ nativeEvent: { layout } }: LayoutChangeEvent) => setBox((was) => (was.width === layout.width && was.height === layout.height ? was : { width: layout.width, height: layout.height }));
   const [gone, setGone] = useState(!needed);
+  useLayoutEffect(() => onShownChange?.(!gone), [gone, onShownChange]);
   const opacity = useSharedValue(needed ? 1 : 0);
   useEffect(() => {
     if (!needed || frozen) return;

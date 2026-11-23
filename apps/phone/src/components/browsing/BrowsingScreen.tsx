@@ -166,8 +166,9 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
   const layout = underBar ? { pageBottom: 0, toneBottom: android || design === "material" ? 0 : barSlotHeight } : pageInsets(collapse.collapses, barSlotHeight, browseLayout.pageOverlap);
   const obscured = underBar ? { top: insets.top, bottom: coveredBottom } : undefined;
   const bottomInsetTransitionMs = android && underBar && collapse.collapsed && folds && !reduceMotion && !barCleared ? 300 : undefined;
+  const [coverShown, setCoverShown] = useState(false);
   const pageCovered = useBrowse((s) => s.covered === tab.id || s.sheet !== null);
-  const blurVisible = !pageCovered && !menu.mounted && !reader.shown && !pressing && !tabsMenu;
+  const blurVisible = !coverShown && !pageCovered && !menu.mounted && !reader.shown && !pressing && !tabsMenu;
   const bottomBlurNavigationInset = android && underBar && blurVisible && !reduceTransparency && coveredBottom > 0 ? insets.bottom : undefined;
   const summaryBottomInset = design === "material" ? materialSummaryBottom : undefined;
   const painted = useSharedValue(false);
@@ -237,7 +238,7 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
           {underBar ? null : <Animated.View testID="pageStatusStrip" style={[{ height: insets.top }, statusStyle]} />}
           <View testID="pageArea" style={[styles.page, { marginBottom: layout.pageBottom }]}>
             <PageSurface key={tab.id} tab={tab} toneBottom={layout.toneBottom} obscured={obscured} bottomInsetTransitionMs={bottomInsetTransitionMs} bottomBlurNavigationInset={bottomBlurNavigationInset} summaryBottomInset={summaryBottomInset} pinsSafeArea={pulls ? true : undefined} />
-            <PageCover key={`${tab.id}:cover`} tab={tab} />
+            <PageCover key={`${tab.id}:cover`} tab={tab} onShownChange={android ? setCoverShown : undefined} />
             <PageFailureView key={`${tab.id}:failure`} tabId={tab.id} />
           </View>
           {underBar ? <Animated.View testID="pageStatusStrip" pointerEvents="none" style={[styles.statusOver, { height: insets.top }, statusStyle]} /> : null}

@@ -96,7 +96,10 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
         val y = web?.scrollY ?: 0
         if (web === observedWeb && (x != observedScrollX || y != observedScrollY)) {
             insetSettlement.scrolled(SystemClock.uptimeMillis())
-            if (bottomBlurNavigationInset != null) invalidate()
+            if (bottomBlurNavigationInset != null) {
+                bottomBlur?.viewportScrolled()
+                invalidate()
+            }
         }
         observedWeb = web
         observedScrollX = x

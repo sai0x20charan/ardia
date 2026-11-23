@@ -113,7 +113,9 @@ const pageViewModule = require("@ardia/phone-native/src/PageView") as typeof imp
 test("the redesigned bar clears the WebView on Android, overlays the page on iPhone, and only its controls take touches", () => {
   jest.spyOn(pageViewModule, "pageObscuresInsets").mockImplementation(() => true);
   const android = Platform.OS === "android";
-  const root = page("redesigned");
+  const tab = currentTabs().open[0]!;
+  storeNavigation(tab.id, { url: tab.url, isLive: true, isLoading: false } as unknown as PageState);
+  const root = page("redesigned", tab);
   const view = root.root.findAll((node) => node.props.pageId !== undefined && node.props.obscuredInsets !== undefined)[0]!;
   expect(view.props.obscuredInsets).toEqual({ top: 47, bottom: android ? 90 : 75 });
   expect(view.props.toneInsets).toEqual({ top: 0, bottom: android ? 0 : 75 });

@@ -42,11 +42,16 @@ internal class PageBottomBlur(density: Float, private val invalidate: () -> Unit
     private var pending: Job? = null
     private var capturedAt = 0L
     private var published = false
+    private var scrollVersion = 0L
     private val mask = Paint().apply { blendMode = BlendMode.DST_IN }
     private var maskEdge = -1
     private var maskTop = -1
     private var navigationTop = -1
     private var fadeBottom = -1
+
+    fun viewportScrolled() {
+        scrollVersion += 1
+    }
 
     fun clear() {
         source = null
@@ -89,11 +94,12 @@ internal class PageBottomBlur(density: Float, private val invalidate: () -> Unit
                 return@launch
             }
             capturedAt = SystemClock.uptimeMillis()
+            val sampledScroll = scrollVersion
             val strip = PageCapture.copyWindow(next.view, next.region, next.width, next.height)
             pending = null
             if (strip != null && canCapture(next)) {
                 pixels = strip
-                published = true
+                published = sampledScroll == scrollVersion
                 invalidate()
             } else {
                 strip?.recycle()
