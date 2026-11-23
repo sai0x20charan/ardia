@@ -252,7 +252,7 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
         <PageProgressLine tabId={tab.id} top={insets.top} />
         </PageStack>
         </FrostSource>
-        {android && underBar && !barCleared && !collapse.collapsed && !collapse.hidden && !reduceTransparency && barBlurHeight > 0 ? (
+        {android && underBar && !barCleared && !collapse.hidden && !reduceTransparency && barBlurHeight > 0 ? (
           <FadeView testID="pageBarBottomBlur" pointerEvents="none" top={{ length: barBlurHeight }} style={[styles.bottomBlur, { height: barBlurHeight }]}>
             <Frost source={PAGE_FROST} variant="thin" dark={barDark} sampleOffsetY={coveredBottom} pointerEvents="none" style={StyleSheet.absoluteFill} />
           </FadeView>

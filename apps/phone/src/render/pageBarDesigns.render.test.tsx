@@ -161,6 +161,7 @@ test("Android reserves clearance for the expanded bar and the collapsed pill whi
   if (android) {
     expect(bottom(root)).toBeGreaterThan(34);
     expect(bottom(root)).toBeLessThan(75 + lift);
+    expect(host(root, "pageBarBottomBlur")?.props.pointerEvents).toBe("none");
     expect(pageView(root).props.bottomInsetTransitionMs).toBe(300);
   } else {
     expect(bottom(root)).toBe(75);
