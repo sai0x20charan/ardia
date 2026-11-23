@@ -83,7 +83,6 @@ internal class WebViewPage(
     private var bottomInsetHandler: ScriptHandler? = null
     private var bottomInsetDp = 0.0
     private var bottomInsetViewportHeightDp = 0.0
-    private var bottomInsetBlurEnabled = false
     private var desktopRewritesShown = 0
     private var desktopStartShown = false
     private var desktopFinishedWidth: Double? = null
@@ -599,16 +598,15 @@ internal class WebViewPage(
     }
 
     @SuppressLint("RequiresFeature")
-    override fun setBottomInset(insetDp: Double, viewportHeightDp: Double, blurEnabled: Boolean) {
+    override fun setBottomInset(insetDp: Double, viewportHeightDp: Double) {
         val nextInset = insetDp.coerceAtLeast(0.0)
         val nextHeight = viewportHeightDp.coerceAtLeast(0.0)
-        if (bottomInsetDp == nextInset && bottomInsetViewportHeightDp == nextHeight && bottomInsetBlurEnabled == blurEnabled) return
+        if (bottomInsetDp == nextInset && bottomInsetViewportHeightDp == nextHeight) return
         bottomInsetDp = nextInset
         bottomInsetViewportHeightDp = nextHeight
-        bottomInsetBlurEnabled = blurEnabled
         val web = webView ?: return
         installBottomInset(web)
-        web.evaluateJavascript(PageBottomInset.updateCall(nextInset, nextHeight, blurEnabled), null)
+        web.evaluateJavascript(PageBottomInset.updateCall(nextInset, nextHeight), null)
     }
 
     @SuppressLint("RequiresFeature")
@@ -617,7 +615,7 @@ internal class WebViewPage(
         bottomInsetHandler?.remove()
         bottomInsetHandler = WebViewCompat.addDocumentStartJavaScript(
             web,
-            PageBottomInset.script(bottomInsetDp, bottomInsetViewportHeightDp, bottomInsetBlurEnabled),
+            PageBottomInset.script(bottomInsetDp, bottomInsetViewportHeightDp),
             setOf("*"),
         )
     }
@@ -682,7 +680,7 @@ internal class WebViewPage(
             nightShadeSource?.let { web.evaluateJavascript(it, null) }
             if (desktopSite) web.evaluateJavascript(PageScripts.desktopViewport, null)
             installedBundle?.let { web.evaluateJavascript(it, null) }
-            if (bottomInsetDp > 0.0) web.evaluateJavascript(PageBottomInset.script(bottomInsetDp, bottomInsetViewportHeightDp, bottomInsetBlurEnabled), null)
+            if (bottomInsetDp > 0.0) web.evaluateJavascript(PageBottomInset.script(bottomInsetDp, bottomInsetViewportHeightDp), null)
         } else if (changed) {
             installedBundle?.let { web.evaluateJavascript(it, null) }
         }
@@ -743,8 +741,8 @@ internal class WebViewPage(
             )
         }
         if (ErrorPages.takesFromPage(failedUrl)) readPageLook(web)
-        if (bottomInsetDp > 0.0 || bottomInsetBlurEnabled) {
-            web.evaluateJavascript(PageBottomInset.updateCall(bottomInsetDp, bottomInsetViewportHeightDp, bottomInsetBlurEnabled), null)
+        if (bottomInsetDp > 0.0) {
+            web.evaluateJavascript(PageBottomInset.updateCall(bottomInsetDp, bottomInsetViewportHeightDp), null)
         }
         if (desktopSite) {
             val load = desktopLoad

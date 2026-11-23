@@ -3,20 +3,17 @@ package com.ardia.browser
 import java.util.Locale
 
 internal object PageBottomInset {
-    fun script(insetDp: Double, viewportHeightDp: Double, blurEnabled: Boolean): String {
+    fun script(insetDp: Double, viewportHeightDp: Double): String {
         val inset = format(insetDp)
         val height = format(viewportHeightDp)
-        val blur = if (blurEnabled) "true" else "false"
         return """
 (() => {
   if (window !== window.top) return;
   const STYLE_ID = "__ardia_bottom_inset_style";
-  const BLUR_ID = "__ardia_bottom_blur";
   const APRON_ID = "__ardia_bottom_apron";
   const state = window.__ardiaBottomInset || (window.__ardiaBottomInset = {
     insetDp: 0,
     viewHeightDp: 0,
-    blurEnabled: false,
     lastPx: 0,
     appliedPadding: 0,
     hadBodyPadding: false,
@@ -41,11 +38,6 @@ internal object PageBottomInset {
     return Math.max(0, Math.min(Math.round(scaled), Math.round(inner * 0.4)));
   };
 
-  const setMask = (el, gradient) => {
-    el.style.setProperty("-webkit-mask-image", gradient, "important");
-    el.style.setProperty("mask-image", gradient, "important");
-  };
-
   const setBackdrop = (el, filter) => {
     el.style.setProperty("-webkit-backdrop-filter", filter, "important");
     el.style.setProperty("backdrop-filter", filter, "important");
@@ -63,27 +55,6 @@ internal object PageBottomInset {
     const a = parts.length >= 4 ? parseFloat(parts[3]) : 1;
     if (!isFinite(r) || !isFinite(g) || !isFinite(b) || !isFinite(a)) return null;
     return { r: Math.round(r), g: Math.round(g), b: Math.round(b), a };
-  };
-
-  const pageGlassLook = () => {
-    const bodyBg = document.body ? parseRgba(getComputedStyle(document.body).backgroundColor) : null;
-    const rootBg = document.documentElement ? parseRgba(getComputedStyle(document.documentElement).backgroundColor) : null;
-    const chosen = bodyBg && bodyBg.a > 0.1 ? bodyBg : rootBg && rootBg.a > 0.1 ? rootBg : null;
-    let isDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    if (chosen) {
-      const luma = (0.299 * chosen.r + 0.587 * chosen.g + 0.114 * chosen.b) / 255;
-      isDark = luma < 0.45;
-    }
-    if (isDark) {
-      return {
-        filter: "blur(20px) saturate(1.85) contrast(1.08) brightness(0.94)",
-        glaze: "linear-gradient(to bottom,transparent 0%,rgba(255,255,255,0.09) 20%,rgba(18,20,24,0.30) 44%,rgba(18,20,24,0.46) 100%)",
-      };
-    }
-    return {
-      filter: "blur(20px) saturate(1.9) contrast(1.06) brightness(1.04)",
-      glaze: "linear-gradient(to bottom,transparent 0%,rgba(255,255,255,0.38) 20%,rgba(255,255,255,0.22) 44%,rgba(255,255,255,0.38) 100%)",
-    };
   };
 
   const findBarSurface = (el, minWidth) => {
@@ -134,67 +105,12 @@ internal object PageBottomInset {
     apron.style.setProperty("transition", animate ? "height 260ms cubic-bezier(0.2,0,0,1)" : "none", "important");
     apron.style.setProperty("height", (px + 1) + "px", "important");
     apron.style.setProperty("background-color", surface.backgroundColor, "important");
-    if (surface.backdropFilter && state.blurEnabled) {
+    if (surface.backdropFilter) {
       setBackdrop(apron, surface.backdropFilter);
     } else {
       apron.style.removeProperty("-webkit-backdrop-filter");
       apron.style.removeProperty("backdrop-filter");
     }
-  };
-
-  const ensureBlur = (px, apronActive, animate) => {
-    const root = document.documentElement;
-    if (!root) return;
-    let host = document.getElementById(BLUR_ID);
-    if (!state.blurEnabled || px <= 0 || apronActive) {
-      if (host) host.remove();
-      return;
-    }
-    const feather = Math.max(10, Math.round(px * 0.14));
-    const totalHeight = px + feather;
-    const look = pageGlassLook();
-    if (!host) {
-      host = document.createElement("div");
-      host.id = BLUR_ID;
-      host.setAttribute("aria-hidden", "true");
-      host.style.setProperty("position", "fixed", "important");
-      host.style.setProperty("left", "0", "important");
-      host.style.setProperty("right", "0", "important");
-      host.style.setProperty("bottom", "0", "important");
-      host.style.setProperty("pointer-events", "none", "important");
-      host.style.setProperty("z-index", "2147483647", "important");
-      host.style.setProperty("overflow", "hidden", "important");
-      host.style.setProperty("transform", "translateZ(0)", "important");
-      const edge = document.createElement("div");
-      edge.style.setProperty("position", "absolute", "important");
-      edge.style.setProperty("inset", "0", "important");
-      edge.style.setProperty("pointer-events", "none", "important");
-      setBackdrop(edge, "blur(6px) saturate(1.4)");
-      setMask(edge, "linear-gradient(to bottom,transparent 0%,black 12%,black 22%,transparent 32%)");
-      host.appendChild(edge);
-      const pane = document.createElement("div");
-      pane.dataset.role = "glassPane";
-      pane.style.setProperty("position", "absolute", "important");
-      pane.style.setProperty("inset", "0", "important");
-      pane.style.setProperty("pointer-events", "none", "important");
-      setMask(pane, "linear-gradient(to bottom,transparent 10%,black 26%,black 100%)");
-      host.appendChild(pane);
-      const glaze = document.createElement("div");
-      glaze.dataset.role = "glassGlaze";
-      glaze.style.setProperty("position", "absolute", "important");
-      glaze.style.setProperty("inset", "0", "important");
-      glaze.style.setProperty("pointer-events", "none", "important");
-      host.appendChild(glaze);
-      root.appendChild(host);
-    } else if (host.parentNode !== root) {
-      root.appendChild(host);
-    }
-    const pane = host.querySelector('[data-role="glassPane"]');
-    if (pane) setBackdrop(pane, look.filter);
-    const glaze = host.querySelector('[data-role="glassGlaze"]');
-    if (glaze) glaze.style.setProperty("background", look.glaze, "important");
-    host.style.setProperty("transition", animate ? "height 260ms cubic-bezier(0.2,0,0,1)" : "none", "important");
-    host.style.setProperty("height", totalHeight + "px", "important");
   };
 
   const restoreBody = () => {
@@ -277,7 +193,7 @@ internal object PageBottomInset {
           let node = hits[i];
           while (node && node !== document.body && node !== document.documentElement && !visited.has(node)) {
             visited.add(node);
-            if (node.nodeType === 1 && node.id !== BLUR_ID && node.id !== APRON_ID) {
+            if (node.nodeType === 1 && node.id !== APRON_ID) {
               const pos = getComputedStyle(node).position;
               if (pos === "fixed") candidates.add(node);
             }
@@ -299,7 +215,7 @@ internal object PageBottomInset {
     const height = window.innerHeight;
     let apronSurface = null;
     for (const el of candidates) {
-      if (el.id === BLUR_ID || el.id === APRON_ID) continue;
+      if (el.id === APRON_ID) continue;
       const existing = state.lifted.get(el);
       const style = getComputedStyle(el);
       if (style.position !== "fixed" || style.display === "none" || style.visibility === "hidden" || parseFloat(style.opacity) === 0 || style.bottom === "auto") {
@@ -382,7 +298,6 @@ internal object PageBottomInset {
       applyBody(px);
       const apronSurface = applyFixed(px, animate);
       ensureApron(px, apronSurface, animate);
-      ensureBlur(px, Boolean(apronSurface), animate);
       state.lastPx = px;
     } catch (_) {}
   };
@@ -399,10 +314,9 @@ internal object PageBottomInset {
     }, 120);
   };
 
-  window.__ardiaSetBottomInset = (nextInsetDp, nextViewHeightDp, nextBlurEnabled) => {
+  window.__ardiaSetBottomInset = (nextInsetDp, nextViewHeightDp) => {
     state.insetDp = Number(nextInsetDp) > 0 ? Number(nextInsetDp) : 0;
     state.viewHeightDp = Number(nextViewHeightDp) > 0 ? Number(nextViewHeightDp) : 0;
-    state.blurEnabled = Boolean(nextBlurEnabled);
     applyAll();
   };
 
@@ -424,13 +338,13 @@ internal object PageBottomInset {
     window.addEventListener("resize", schedule, { passive: true });
   }
 
-  window.__ardiaSetBottomInset($inset,$height,$blur);
+  window.__ardiaSetBottomInset($inset,$height);
 })();
         """.trimIndent()
     }
 
-    fun updateCall(insetDp: Double, viewportHeightDp: Double, blurEnabled: Boolean): String =
-        "window.__ardiaSetBottomInset&&window.__ardiaSetBottomInset(${format(insetDp)},${format(viewportHeightDp)},${if (blurEnabled) "true" else "false"})"
+    fun updateCall(insetDp: Double, viewportHeightDp: Double): String =
+        "window.__ardiaSetBottomInset&&window.__ardiaSetBottomInset(${format(insetDp)},${format(viewportHeightDp)})"
 
     private fun format(value: Double): String =
         String.format(Locale.US, "%.2f", value.coerceAtLeast(0.0))

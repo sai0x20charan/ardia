@@ -60,7 +60,7 @@ interface Page : AutoCloseable {
 
     fun setDesktopSite(enabled: Boolean)
 
-    fun setBottomInset(insetDp: Double, viewportHeightDp: Double, blurEnabled: Boolean) {}
+    fun setBottomInset(insetDp: Double, viewportHeightDp: Double) {}
 
     fun download(url: String)
 

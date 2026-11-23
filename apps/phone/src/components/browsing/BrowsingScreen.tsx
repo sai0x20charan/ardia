@@ -48,7 +48,6 @@ import {
   useTheme,
   type MenuItem,
   useReduceMotion,
-  useReduceTransparency,
 } from "../ui";
 import { BottomBar } from "./BottomBar";
 import { FloatingBar } from "./FloatingBar";
@@ -159,16 +158,12 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
   const expandedBottom = design === "material" ? insets.bottom + materialBottomBar.inset + materialBottomBar.height : barTop;
   const collapsedBottom = design === "material" ? materialPillBottom : barTop - floatingBarLayout.control + (hostPillLayout.height + controlSize.hitTarget) / 2;
   const reduceMotion = useReduceMotion();
-  const reduceTransparency = useReduceTransparency();
   const coveredBottom = android
     ? barCleared ? 0 : collapse.collapsed && folds ? collapsedBottom : expandedBottom
     : obscuredBottom({ insetsScroll: true, bar: barSlotHeight, collapses: collapse.collapses, cleared: barCleared });
   const layout = underBar ? { pageBottom: 0, toneBottom: android || design === "material" ? 0 : barSlotHeight } : pageInsets(collapse.collapses, barSlotHeight, browseLayout.pageOverlap);
   const obscured = underBar ? { top: insets.top, bottom: coveredBottom } : undefined;
   const bottomInsetTransitionMs = android && underBar && collapse.collapsed && folds && !reduceMotion && !barCleared ? 300 : undefined;
-  const pageCovered = useBrowse((s) => s.covered === tab.id || s.sheet !== null);
-  const blurVisible = !pageCovered && !menu.mounted && !reader.shown && !pressing && !tabsMenu;
-  const bottomBlur = android && underBar && blurVisible && !reduceTransparency && coveredBottom > 0 ? true : undefined;
   const summaryBottomInset = design === "material" ? materialSummaryBottom : undefined;
   const painted = useSharedValue(false);
   useEffect(() => {
@@ -236,7 +231,7 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
         <Animated.View style={[StyleSheet.absoluteFill, styles.outgoing, { backgroundColor: theme.canvas }, pager.outgoing]}>
           {underBar ? null : <Animated.View testID="pageStatusStrip" style={[{ height: insets.top }, statusStyle]} />}
           <View testID="pageArea" style={[styles.page, { marginBottom: layout.pageBottom }]}>
-            <PageSurface key={tab.id} tab={tab} toneBottom={layout.toneBottom} obscured={obscured} bottomInsetTransitionMs={bottomInsetTransitionMs} bottomBlur={bottomBlur} summaryBottomInset={summaryBottomInset} pinsSafeArea={pulls ? true : undefined} />
+            <PageSurface key={tab.id} tab={tab} toneBottom={layout.toneBottom} obscured={obscured} bottomInsetTransitionMs={bottomInsetTransitionMs} summaryBottomInset={summaryBottomInset} pinsSafeArea={pulls ? true : undefined} />
             <PageCover key={`${tab.id}:cover`} tab={tab} />
             <PageFailureView key={`${tab.id}:failure`} tabId={tab.id} />
           </View>

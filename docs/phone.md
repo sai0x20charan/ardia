@@ -2605,16 +2605,10 @@ Not audited at all: Compose's `SyncSetupContent` internals inside onboarding.
 - The page under the bar (the owner's decision, 2026-11-16, revised 2026-11-22).
   - **iPhone:** the page runs full screen under the glass bar, and WebKit gets the covered edges as
     `obscuredContentInsets`, so fixed footers and the page's last lines stay above the bar.
-  - **Android:** the WebView runs full height behind the floating bottom controls with no solid background band around them.
-    `PageBottomInset` injects bottom scroll clearance (`padding-bottom` and `scroll-padding-bottom`) and lifts bottom-anchored
-    `position: fixed` controls above the toolbar height, so fixed footers stay tappable and scrolling to the end of the page
-    reveals the page's own background behind the bar. The expanded toolbar gets its full clearance immediately; the folded pill
-    reclaims its share once scrolling settles. Fullscreen, find and search clear the inset.
-  - **The lower edge on Android:** a progressive Chromium `backdrop-filter` blur inside the WebView blurs the real page content
-    behind the bottom bar at full frame rate, feathering smoothly into the page above without mirroring or window readback.
-    At the end of a page, the cleared page background naturally shows as a solid colour through the blur. With reduced
-    transparency or on a constrained device, the blur overlay turns off while keeping the bottom clearance. The existing
-    `bottom_bar_collapses` count tracks fold use.
+  - **Android:** the WebView runs full height behind the floating bottom controls with no solid background band or blur around them.
+    `PageBottomInset` injects bottom scroll clearance (`padding-bottom` and `scroll-padding-bottom`), lifts bottom-anchored
+    `position: fixed` controls above the toolbar height (extending full-width fixed bottom bars seamlessly down to the screen edge),
+    and animates with the bar fold. Fullscreen, find and search clear the inset. The existing `bottom_bar_collapses` count tracks fold use.
   - Both platforms receive `obscuredInsets` and `toneInsets`. Android's `PageView` lays out the WebView between
     the bands, samples tone at its visible edge, and includes the bands' colours when composing deck snapshots.
   - **The tone under the bars on Android** (2026-11-22): each sampled edge also keeps its strip's commonest colour,

@@ -39,12 +39,6 @@ import kotlinx.coroutines.launch
 class PageView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
     private val onPageEvent by EventDispatcher()
     private val host = FrameLayout(context)
-    var bottomBlur: Boolean = false
-        set(value) {
-            if (field == value) return
-            field = value
-            syncBottomInset()
-        }
     private var scope: CoroutineScope? = null
     private var sampled: PageTone? = null
     private var sampledDocument = -1L
@@ -235,8 +229,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
         if (density <= 0f) return
         val insetDp = appliedObscuredInsets.second.coerceAtLeast(0.0)
         val viewportHeightDp = (height - bands().top).coerceAtLeast(0) / density.toDouble()
-        val blur = bottomBlur && insetDp > 0.0 && !LookBudget.isDegraded(context)
-        opened.setBottomInset(insetDp, viewportHeightDp, blur)
+        opened.setBottomInset(insetDp, viewportHeightDp)
     }
 
     init {
