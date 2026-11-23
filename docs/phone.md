@@ -2605,30 +2605,22 @@ Not audited at all: Compose's `SyncSetupContent` internals inside onboarding.
 - The page under the bar (the owner's decision, 2026-11-16, revised 2026-11-22).
   - **iPhone:** the page runs full screen under the glass bar, and WebKit gets the covered edges as
     `obscuredContentInsets`, so fixed footers and the page's last lines stay above the bar.
-  - **Android, with Collapse Bottom Bar on (the default):** the page runs full screen under the bar and the host
-    pill, as on iPhone, with no fade over it (the owner, 2026-11-22: iPhone keeps its fade). The page is never resized while
-    scrolling, so no flat band shows behind the pill. Android's WebView has no obscured-insets equivalent (only
-    `viewport-fit=cover` pages on WebView 140 and later get `env(safe-area-inset-*)`), so a fixed footer sits
-    under the bar until a scroll down folds it to the pill, and the page's last lines sit under the pill's base.
-    The owner chose that over the band on 2026-11-22.
-  - **Android, with Collapse Bottom Bar off:** the bar never moves, so the page stops at its top and the band
-    under it takes the page's bottom tone; otherwise the page's end could never scroll clear of it.
-  - **One shape in JavaScript:** `pageObscuresInsets()` is true on both, and the bar code passes the same
-    `obscuredInsets` and `toneInsets` on both (`obscuredBottom` in `lib/barCollapse.ts`). It also passes
-    `obscuredColors`, the colours its own bars use: the page's remembered tone, or the theme's surface before it
-    has one.
-  - **What Android's page view does with them** (`PageView`, `PageBands`):
-    - it lays the WebView out between the bands and paints the bands in those colours;
-    - it samples the tone at the WebView's own edge;
-    - it composes deck snapshots with the bands, so a card is the page as shown.
+  - **Android:** the WebView stops at the top of the floating controls so fixed footers and the last lines stay
+    tappable. The expanded toolbar gets its full clearance immediately. The folded pill reclaims its share of the
+    viewport once scrolling settles. Fullscreen and search clear the browsing toolbar inset.
+  - **The lower edge on Android:** a live blur of the adjacent WebView extends into the sides and below the toolbar.
+    It feathers in over the last 12 dp of the page and uses the reflected page edge to fill the space beyond the
+    viewport. Before the first web frame, with reduced transparency, or on a constrained device, the area uses the
+    page's sampled bottom tone. The controls keep their own surfaces. The existing `bottom_bar_collapses` count
+    tracks fold use. The lab's `blurLayerRenders` counter includes the page edge for rendering cost checks.
+  - Both platforms receive `obscuredInsets` and `toneInsets`. Android's `PageView` lays out the WebView between
+    the bands, samples tone at its visible edge, and includes the bands' colours when composing deck snapshots.
   - **The tone under the bars on Android** (2026-11-22): each sampled edge also keeps its strip's commonest colour,
     even when text or images keep any one colour from a third of it (`ToneSampler.shade`). The theme colour, the
     page's background colour and earlier samples are used only when they are on the same side of dark as that
     shade, so a site that declares a light `theme-color` but draws dark (Wikipedia at night) gets dark bars and a dark
     fade. An edge the latest sample can't tell keeps the last one sampled on the same document. iPhone still puts the
     theme colour first at the top.
-  - **Revisit** if Android's WebView gains an equivalent of `obscuredContentInsets`: then hand it the bar's height
-    as iPhone does, so fixed footers and the page's end clear the bar too.
 - Long press on links and images in a page: iPhone shows WebKit's system menu with Open in New Tab, Open in Background, Copy Link, Share and Download Linked File (the SwiftUI app says Share…; Share has no ellipsis anywhere in the Expo app); Android shows the app's drawn menu from `page.longPress` (c317c5b8f).
 - Voice screen status-bar icons: always light; Compose takes them from the light-mode tint although the screen is always dark (3a9ca2f10, `lib/statusInk.ts`).
 - A link's `download="name"`: iPhone saves under WebKit's `suggestedFilename` as given (`DownloadManager.destination`), which WebKit fills from the response's Content-Disposition or the link's `download` attribute; Android names a download from its URL (`DownloadRules.linkName`, `URLUtil.guessFileName`) and, for a link with no type or disposition, from the response, as Download Linked File does, and reads no `download` attribute. A known gap, not to be added on Android without a decision (`SystemDownloadsTest`).

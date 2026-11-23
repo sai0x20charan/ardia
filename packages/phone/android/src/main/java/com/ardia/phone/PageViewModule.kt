@@ -412,6 +412,8 @@ class PageViewModule : Module() {
 
             Prop("bottomInsetTransitionMs") { view: PageView, millis: Int? -> view.bottomInsetTransitionMs = (millis ?: 0).coerceIn(0, 300) }
 
+            Prop("blurBottomEdge") { view: PageView, enabled: Boolean? -> view.blurBottomEdge = enabled == true }
+
             Prop("summaryBottomInset") { view: PageView, inset: Double? -> view.summaryBottomInset = (inset ?: 0.0).coerceAtLeast(0.0) }
 
             Prop("obscuredInsets") { view: PageView, insets: List<Double>? ->

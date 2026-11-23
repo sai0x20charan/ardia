@@ -28,6 +28,7 @@ import {
   barHeight,
   browseLayout,
   chromeLayout,
+  controlSize,
   isDarkColor,
   Menu,
   Shade,
@@ -47,6 +48,7 @@ import {
   useTheme,
   type MenuItem,
   useReduceMotion,
+  useReduceTransparency,
 } from "../ui";
 import { BottomBar } from "./BottomBar";
 import { FloatingBar } from "./FloatingBar";
@@ -147,11 +149,24 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
   const folds = squeeze === null;
   const staged = design === "redesigned" && searchStageIsNative();
   useEffect(() => (staged && !collapse.hidden ? reportBarPill() : undefined), [staged, collapse.hidden]);
-  const layout = underBar ? { pageBottom: 0, toneBottom: design === "material" ? 0 : barSlotHeight } : pageInsets(collapse.collapses, barSlotHeight, browseLayout.pageOverlap);
   const fullscreen = usePages((s) => s.fullscreen[tab.id] ?? false);
-  const coveredBottom = obscuredBottom({ insetsScroll: Platform.OS === "ios", bar: barSlotHeight, collapses: collapse.collapses, cleared: fullscreen || finding || searching });
+  const android = Platform.OS === "android";
+  const barCleared = fullscreen || finding || searching;
+  const barCenter = barCenterFromBottom(insets.bottom, design);
+  const barTop = barCenter + floatingBarLayout.control / 2;
+  const materialPillBottom = insets.bottom + materialBottomBar.inset + materialBarPill.height;
+  const materialSummaryBottom = fullscreen || searching ? insets.bottom : collapse.collapsed ? materialPillBottom : barSlotHeight;
+  const expandedBottom = design === "material" ? barSlotHeight : barTop;
+  const collapsedBottom = design === "material" ? materialPillBottom : barTop - floatingBarLayout.control + (hostPillLayout.height + controlSize.hitTarget) / 2;
+  const reduceMotion = useReduceMotion();
+  const reduceTransparency = useReduceTransparency();
+  const coveredBottom = android
+    ? barCleared ? 0 : collapse.collapsed && folds ? collapsedBottom : expandedBottom
+    : obscuredBottom({ insetsScroll: true, bar: barSlotHeight, collapses: collapse.collapses, cleared: barCleared });
+  const layout = underBar ? { pageBottom: 0, toneBottom: android || design === "material" ? 0 : barSlotHeight } : pageInsets(collapse.collapses, barSlotHeight, browseLayout.pageOverlap);
   const obscured = underBar ? { top: insets.top, bottom: coveredBottom } : undefined;
-  const materialSummaryBottom = fullscreen || searching ? insets.bottom : collapse.collapsed ? insets.bottom + materialBottomBar.inset + materialBarPill.height : barSlotHeight;
+  const bottomInsetTransitionMs = android && underBar && collapse.collapsed && folds && !reduceMotion && !barCleared ? 300 : undefined;
+  const blurBottomEdge = android && underBar && !reduceTransparency && coveredBottom > 0;
   const summaryBottomInset = design === "material" ? materialSummaryBottom : undefined;
   const painted = useSharedValue(false);
   useEffect(() => {
@@ -168,7 +183,6 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
     if (id) switchToNeighbour(id);
   }, []);
   const incognito = useIncognito();
-  const reduceMotion = useReduceMotion();
   const pulls = design === "redesigned";
   const tracks = pulls && !reduceMotion;
   useEffect(() => {
@@ -176,8 +190,6 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
     armDeckPull(tab.id, reduceMotion);
     return () => disarmDeckPull(tab.id, deckPullSettled);
   }, [pulls, reduceMotion, tab.id]);
-  const barCenter = barCenterFromBottom(insets.bottom, design);
-  const barTop = barCenter + floatingBarLayout.control / 2;
   const barShift = usePullBarShift(barTop, barCenter - redesignedBarCenterFromBottom(insets.bottom, Platform.OS));
   const swipesUp = !searching && !collapse.hidden && !(pulls && collapse.collapsed);
   const openDeckFromBar = () => {
@@ -222,7 +234,7 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
         <Animated.View style={[StyleSheet.absoluteFill, styles.outgoing, { backgroundColor: theme.canvas }, pager.outgoing]}>
           {underBar ? null : <Animated.View testID="pageStatusStrip" style={[{ height: insets.top }, statusStyle]} />}
           <View testID="pageArea" style={[styles.page, { marginBottom: layout.pageBottom }]}>
-            <PageSurface key={tab.id} tab={tab} toneBottom={layout.toneBottom} obscured={obscured} summaryBottomInset={summaryBottomInset} pinsSafeArea={pulls ? true : undefined} />
+            <PageSurface key={tab.id} tab={tab} toneBottom={layout.toneBottom} obscured={obscured} bottomInsetTransitionMs={bottomInsetTransitionMs} blurBottomEdge={blurBottomEdge} summaryBottomInset={summaryBottomInset} pinsSafeArea={pulls ? true : undefined} />
             <PageCover key={`${tab.id}:cover`} tab={tab} />
             <PageFailureView key={`${tab.id}:failure`} tabId={tab.id} />
           </View>

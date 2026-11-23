@@ -39,6 +39,15 @@ import kotlinx.coroutines.launch
 class PageView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
     private val onPageEvent by EventDispatcher()
     private val host = FrameLayout(context)
+    private var bottomBlur: PageBottomBlur? = null
+    private var hostAtRest = true
+    var blurBottomEdge = false
+        set(value) {
+            if (field == value) return
+            field = value
+            if (!value) clearBottomBlur()
+            invalidate()
+        }
     private var scope: CoroutineScope? = null
     private var sampled: PageTone? = null
     private var sampledDocument = -1L
@@ -168,6 +177,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
         },
     ) {
         cover.pageDrawn()
+        if (blurBottomEdge) invalidate()
         lab { "page view ${page?.id ?: pageId} drawn ${SystemClock.uptimeMillis() - drawnAskedAt} ms after it became visible" }
         onPageEvent(mapOf("name" to "drawn"))
     }
@@ -219,6 +229,29 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
             }
         }
         super.dispatchDraw(canvas)
+        drawBottomBlur(canvas, bands.bottom)
+    }
+
+    private fun clearBottomBlur() {
+        bottomBlur?.clear()
+        bottomBlur = null
+    }
+
+    private fun drawBottomBlur(canvas: Canvas, bandHeight: Int) {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S || !blurBottomEdge ||
+            !canvas.isHardwareAccelerated || bandHeight <= 0 || !hostAtRest || width <= 0 ||
+            drawn.stage != PageDrawnWatch.Stage.Drawn || summaryLayer?.visibility == View.VISIBLE ||
+            LookBudget.isDegraded(context) || host.childCount == 0 || page?.view?.value?.parent !== host
+        ) {
+            clearBottomBlur()
+            return
+        }
+        val density = resources.displayMetrics.density
+        val blur = bottomBlur ?: PageBottomBlur(density).also { bottomBlur = it }
+        val time = drawingTime
+        blur.draw(canvas, width, host.top, host.bottom, bandHeight) { recording ->
+            drawChild(recording, host, time)
+        }
     }
 
     init {
@@ -276,6 +309,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
     }
 
     fun unbind() {
+        clearBottomBlur()
         cancelInsetSettlement()
         observedWeb = null
         insetSettlement.touching = false
@@ -299,6 +333,11 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
     private val asksWhenShown = android.view.ViewTreeObserver.OnPreDrawListener {
         if (PhonePages.permissionAsks.pending > 0) PhonePages.permissionAsks.pump()
         drawn.frame()
+        val atRest = host.translationX == 0f && host.translationY == 0f
+        if (hostAtRest != atRest) {
+            hostAtRest = atRest
+            if (blurBottomEdge) invalidate()
+        }
         true
     }
 
@@ -311,6 +350,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
     }
 
     override fun onDetachedFromWindow() {
+        clearBottomBlur()
         dismissSummary(animated = false)
         viewTreeObserver.removeOnPreDrawListener(asksWhenShown)
         viewTreeObserver.removeOnScrollChangedListener(pageScrolled)
@@ -327,6 +367,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
         observedWeb = null
         documentChanged(document.replaced())
         val hadView = host.childCount > 0
+        clearBottomBlur()
         host.removeAllViews()
         drawn.reset()
         if (view == null) {
@@ -368,7 +409,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
         }
         val web = PageDrawnWatch.webViewIn(host)
         val defers = bottomInsetTransitionMs > 0 && appliedObscuredInsets.first == obscuredInsets.first &&
-            appliedObscuredInsets.second > 0 && obscuredInsets.second > 0 && page?.id == pageId && web != null && isAttachedToWindow
+            obscuredInsets.second > 0 && appliedObscuredInsets.second > obscuredInsets.second && page?.id == pageId && web != null && isAttachedToWindow
         if (!defers) {
             applyObscuredInsets()
             return

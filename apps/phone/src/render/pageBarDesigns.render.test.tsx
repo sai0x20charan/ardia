@@ -110,13 +110,14 @@ test("a page loaded over plain http shows a red open lock in place of its icon, 
 
 const pageViewModule = require("@ardia/phone-native/src/PageView") as typeof import("@ardia/phone-native/src/PageView");
 
-test("in the redesign the page runs full screen under the bar, told the top safe area and, on iPhone, the bar's 75 points as obscured insets (none on Android, whose bar collapses by default), the status bar's strip is laid over the page in the page's top colour, nothing is painted between the page and the glass bar, and only the bar's pieces take touches", () => {
+test("the redesigned bar clears the WebView on Android, overlays the page on iPhone, and only its controls take touches", () => {
   jest.spyOn(pageViewModule, "pageObscuresInsets").mockImplementation(() => true);
-  const covered = Platform.OS === "android" ? 75 + 34 + 8 - 21.5 : 75;
+  const android = Platform.OS === "android";
   const root = page("redesigned");
   const view = root.root.findAll((node) => node.props.pageId !== undefined && node.props.obscuredInsets !== undefined)[0]!;
-  expect(view.props.obscuredInsets).toEqual({ top: 47, bottom: Platform.OS === "android" ? 0 : covered });
-  expect(view.props.toneInsets).toEqual({ top: 0, bottom: covered });
+  expect(view.props.obscuredInsets).toEqual({ top: 47, bottom: android ? 90 : 75 });
+  expect(view.props.toneInsets).toEqual({ top: 0, bottom: android ? 0 : 75 });
+  expect(view.props.blurBottomEdge).toBe(android);
   expect(StyleSheet.flatten(host(root, "pageArea")!.props.style).marginBottom).toBe(0);
   const strip = StyleSheet.flatten(host(root, "pageStatusStrip")!.props.style);
   expect(strip).toMatchObject({ position: "absolute", top: 0, left: 0, right: 0, height: 47 });
@@ -142,7 +143,7 @@ test("the bands under the bars take the colours the bars use: the page's sampled
   unmount(toned);
 });
 
-test("on Android the page runs under a bar that collapses, so nothing resizes it while scrolling, and stops above one that doesn't; iPhone keeps SwiftUI's 75", () => {
+test("Android clears the toolbar and pill and drops the blur when the toolbar is replaced", () => {
   jest.spyOn(pageViewModule, "pageObscuresInsets").mockImplementation(() => true);
   const android = Platform.OS === "android";
   const tab = currentTabs().open[0]!;
@@ -151,15 +152,18 @@ test("on Android the page runs under a bar that collapses, so nothing resizes it
   const scrolled = (scrollDirection: "up" | "down") => act(() => storeNavigation(tab.id, { url: "https://site0.example/", title: "Site", isLive: true, isLoading: false, progress: 1, failure: null, canGoBack: false, canGoForward: false, scrollDirection } as unknown as PageState));
   setPreference("collapsesBottomBar", true);
   scrolled("up");
-  const lift = android ? 34 + 8 - 21.5 : 0;
   const root = page("redesigned", tab);
   expect(pageView(root).props.bottomInsetTransitionMs).toBeUndefined();
-  expect(bottom(root)).toBe(android ? 0 : 75);
+  expect(bottom(root)).toBe(android ? 90 : 75);
   scrolled("down");
-  expect(bottom(root)).toBe(android ? 0 : 75);
+  expect(bottom(root)).toBe(android ? 79 : 75);
+  expect(pageView(root).props.bottomInsetTransitionMs).toBe(android ? 300 : undefined);
+  expect(pageView(root).props.blurBottomEdge).toBe(android);
   scrolled("up");
+  expect(bottom(root)).toBe(android ? 90 : 75);
   act(() => storeFullscreen(tab.id, true));
   expect(bottom(root)).toBe(android ? 0 : 75);
+  expect(pageView(root).props.blurBottomEdge).toBe(false);
   act(() => storeFullscreen(tab.id, false));
   act(() => usePageUi.setState({ findOpen: true }));
   expect(bottom(root)).toBe(android ? 0 : 75);
@@ -168,7 +172,7 @@ test("on Android the page runs under a bar that collapses, so nothing resizes it
   expect(bottom(root)).toBe(android ? 0 : 75);
   act(() => useSearch.setState({ open: false }));
   act(() => setPreference("collapsesBottomBar", false));
-  expect(bottom(root)).toBe(75 + lift);
+  expect(bottom(root)).toBe(android ? 90 : 75);
   unmount(root);
 });
 
