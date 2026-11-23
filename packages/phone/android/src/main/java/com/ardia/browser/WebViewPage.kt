@@ -80,6 +80,10 @@ internal class WebViewPage(
     private var nightShadeHandler: ScriptHandler? = null
     private var nightShadeSource: String? = null
     private var nightShadeUrl: String? = null
+    private var bottomInsetHandler: ScriptHandler? = null
+    private var bottomInsetDp = 0.0
+    private var bottomInsetViewportHeightDp = 0.0
+    private var bottomInsetBlurEnabled = false
     private var desktopRewritesShown = 0
     private var desktopStartShown = false
     private var desktopFinishedWidth: Double? = null
@@ -477,6 +481,7 @@ internal class WebViewPage(
             if (bottom - top != oldBottom - oldTop) scrollTracker.resized(SystemClock.uptimeMillis())
         }
         installNightShade(web, mutableState.value.url)
+        installBottomInset(web)
         if (engine.supportsDocumentStartScripts && engine.supportsMessageListener) {
             WebViewCompat.addDocumentStartJavaScript(web, TouchScrollers.script, setOf("*"))
         }
@@ -571,6 +576,7 @@ internal class WebViewPage(
         nightShadeHandler = null
         nightShadeSource = null
         nightShadeUrl = null
+        bottomInsetHandler = null
         installedStart = null
         installedEnd = null
         installedBundle = null
@@ -590,6 +596,30 @@ internal class WebViewPage(
         filterPageUrl = url
         installNightShade(web, url)
         installFilterScripts(web, url)
+    }
+
+    @SuppressLint("RequiresFeature")
+    override fun setBottomInset(insetDp: Double, viewportHeightDp: Double, blurEnabled: Boolean) {
+        val nextInset = insetDp.coerceAtLeast(0.0)
+        val nextHeight = viewportHeightDp.coerceAtLeast(0.0)
+        if (bottomInsetDp == nextInset && bottomInsetViewportHeightDp == nextHeight && bottomInsetBlurEnabled == blurEnabled) return
+        bottomInsetDp = nextInset
+        bottomInsetViewportHeightDp = nextHeight
+        bottomInsetBlurEnabled = blurEnabled
+        val web = webView ?: return
+        installBottomInset(web)
+        web.evaluateJavascript(PageBottomInset.updateCall(nextInset, nextHeight, blurEnabled), null)
+    }
+
+    @SuppressLint("RequiresFeature")
+    private fun installBottomInset(web: WebView) {
+        if (!engine.supportsDocumentStartScripts) return
+        bottomInsetHandler?.remove()
+        bottomInsetHandler = WebViewCompat.addDocumentStartJavaScript(
+            web,
+            PageBottomInset.script(bottomInsetDp, bottomInsetViewportHeightDp, bottomInsetBlurEnabled),
+            setOf("*"),
+        )
     }
 
     @SuppressLint("RequiresFeature")
@@ -652,6 +682,7 @@ internal class WebViewPage(
             nightShadeSource?.let { web.evaluateJavascript(it, null) }
             if (desktopSite) web.evaluateJavascript(PageScripts.desktopViewport, null)
             installedBundle?.let { web.evaluateJavascript(it, null) }
+            if (bottomInsetDp > 0.0) web.evaluateJavascript(PageBottomInset.script(bottomInsetDp, bottomInsetViewportHeightDp, bottomInsetBlurEnabled), null)
         } else if (changed) {
             installedBundle?.let { web.evaluateJavascript(it, null) }
         }
@@ -712,6 +743,9 @@ internal class WebViewPage(
             )
         }
         if (ErrorPages.takesFromPage(failedUrl)) readPageLook(web)
+        if (bottomInsetDp > 0.0 || bottomInsetBlurEnabled) {
+            web.evaluateJavascript(PageBottomInset.updateCall(bottomInsetDp, bottomInsetViewportHeightDp, bottomInsetBlurEnabled), null)
+        }
         if (desktopSite) {
             val load = desktopLoad
             web.postDelayed({ if (load == desktopLoad) fitDesktopWidth(web, DESKTOP_FINISHED) }, FIT_WIDTH_DELAY_MILLIS)

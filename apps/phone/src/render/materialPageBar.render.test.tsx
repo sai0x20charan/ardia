@@ -84,10 +84,7 @@ onAndroid("the material page bar has a rounded capsule with tabs, centered searc
   expect(flat(node(root, "pageArea")).marginBottom).toBe(0);
   const pageView = root.root.findAll((found) => found.props.pageId !== undefined && found.props.obscuredInsets !== undefined)[0]!;
   expect(pageView.props.obscuredInsets.bottom).toBe(24 + 8 + 64);
-  expect(pageView.props.bottomBlurNavigationInset).toBeUndefined();
-  scrolled("up");
-  settle();
-  expect(root.root.findAll((found) => found.props.pageId !== undefined && found.props.obscuredInsets !== undefined)[0]!.props.bottomBlurNavigationInset).toBe(24);
+  expect(pageView.props.bottomBlur).toBe(true);
   expect(pageView.props.summaryBottomInset).toBe(barHeight(24, "material"));
   expect(pageView.props.toneInsets).toEqual({ top: 0, bottom: 0 });
   expect(node(root, "pageBar")!.props.pointerEvents).toBe("box-none");
@@ -418,7 +415,7 @@ onAndroid("scrolling a page down folds the Material bottom bar into a host pill 
   expect(flat(node(root, "materialBarPillPlace"))).toMatchObject({ height: 60, paddingVertical: 12 });
   expect(pageView().props.obscuredInsets.bottom).toBe(24 + 8 + 36);
   expect(pageView().props.bottomInsetTransitionMs).toBe(300);
-  expect(pageView().props.bottomBlurNavigationInset).toBe(24);
+  expect(pageView().props.bottomBlur).toBe(true);
   expect(pageView().props.summaryBottomInset).toBeGreaterThan(0);
   expect(pageView().props.summaryBottomInset).toBeLessThan(expandedSummaryInset);
   scrolled("up");

@@ -3,7 +3,6 @@ package com.ardia.phone
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.os.Build
 import android.os.SystemClock
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
@@ -40,14 +39,11 @@ import kotlinx.coroutines.launch
 class PageView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
     private val onPageEvent by EventDispatcher()
     private val host = FrameLayout(context)
-    private var bottomBlur: PageBottomBlur? = null
-    private var hostAtRest = true
-    var bottomBlurNavigationInset: Float? = null
+    var bottomBlur: Boolean = false
         set(value) {
             if (field == value) return
             field = value
-            if (value == null) clearBottomBlur()
-            invalidate()
+            syncBottomInset()
         }
     private var scope: CoroutineScope? = null
     private var sampled: PageTone? = null
@@ -96,10 +92,6 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
         val y = web?.scrollY ?: 0
         if (web === observedWeb && (x != observedScrollX || y != observedScrollY)) {
             insetSettlement.scrolled(SystemClock.uptimeMillis())
-            if (bottomBlurNavigationInset != null) {
-                bottomBlur?.viewportScrolled()
-                invalidate()
-            }
         }
         observedWeb = web
         observedScrollX = x
@@ -184,7 +176,6 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
         },
     ) {
         cover.pageDrawn()
-        if (bottomBlurNavigationInset != null) invalidate()
         lab { "page view ${page?.id ?: pageId} drawn ${SystemClock.uptimeMillis() - drawnAskedAt} ms after it became visible" }
         onPageEvent(mapOf("name" to "drawn"))
     }
@@ -210,7 +201,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
 
     internal fun bands(): PageBands.Frame {
         val density = resources.displayMetrics.density
-        return PageBands.frame(height, (appliedObscuredInsets.first * density).roundToInt(), (appliedObscuredInsets.second * density).roundToInt())
+        return PageBands.frame(height, (appliedObscuredInsets.first * density).roundToInt(), 0)
     }
 
     internal fun bandColours(): Pair<Int?, Int?> = PageBands.colour(obscuredColours.first, surfaceColor) to PageBands.colour(obscuredColours.second, surfaceColor)
@@ -236,28 +227,16 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
             }
         }
         super.dispatchDraw(canvas)
-        drawBottomBlur(canvas, bands.bottom)
     }
 
-    private fun clearBottomBlur() {
-        bottomBlur?.clear()
-    }
-
-    private fun drawBottomBlur(canvas: Canvas, bandHeight: Int) {
-        val navigationInset = bottomBlurNavigationInset
-        val web = page?.view?.value as? WebView
-        val running = scope
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || navigationInset == null || running == null || web?.parent !== host ||
-            !canvas.isHardwareAccelerated || bandHeight <= 0 || !hostAtRest || width <= 0 ||
-            drawn.stage != PageDrawnWatch.Stage.Drawn || summaryLayer?.visibility == View.VISIBLE ||
-            LookBudget.isDegraded(context) || web.width != width || web.height != host.height
-        ) {
-            clearBottomBlur()
-            return
-        }
+    private fun syncBottomInset() {
+        val opened = page ?: return
         val density = resources.displayMetrics.density
-        val blur = bottomBlur ?: PageBottomBlur(density, ::invalidate).also { bottomBlur = it }
-        blur.draw(canvas, web, running, host.top, host.bottom, bandHeight, (navigationInset * density).roundToInt())
+        if (density <= 0f) return
+        val insetDp = appliedObscuredInsets.second.coerceAtLeast(0.0)
+        val viewportHeightDp = (height - bands().top).coerceAtLeast(0) / density.toDouble()
+        val blur = bottomBlur && insetDp > 0.0 && !LookBudget.isDegraded(context)
+        opened.setBottomInset(insetDp, viewportHeightDp, blur)
     }
 
     init {
@@ -312,10 +291,10 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
         running.launch { opened.view.collect(::show) }
         running.launch { opened.state.collect(::sendState) }
         running.launch { sampleTone(opened) }
+        syncBottomInset()
     }
 
     fun unbind() {
-        clearBottomBlur()
         cancelInsetSettlement()
         observedWeb = null
         insetSettlement.touching = false
@@ -339,11 +318,6 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
     private val asksWhenShown = android.view.ViewTreeObserver.OnPreDrawListener {
         if (PhonePages.permissionAsks.pending > 0) PhonePages.permissionAsks.pump()
         drawn.frame()
-        val atRest = host.translationX == 0f && host.translationY == 0f
-        if (hostAtRest != atRest) {
-            hostAtRest = atRest
-            if (bottomBlurNavigationInset != null) invalidate()
-        }
         true
     }
 
@@ -356,7 +330,6 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
     }
 
     override fun onDetachedFromWindow() {
-        clearBottomBlur()
         dismissSummary(animated = false)
         viewTreeObserver.removeOnPreDrawListener(asksWhenShown)
         viewTreeObserver.removeOnScrollChangedListener(pageScrolled)
@@ -373,7 +346,6 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
         observedWeb = null
         documentChanged(document.replaced())
         val hadView = host.childCount > 0
-        clearBottomBlur()
         host.removeAllViews()
         drawn.reset()
         if (view == null) {
@@ -384,6 +356,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
         owner?.removeView(view)
         host.addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         layOutChildren()
+        syncBottomInset()
         lab {
             val from = if (owner != null) ", taken from another view (${owner.javaClass.simpleName}${(owner.parent as? PageView)?.let { " of page view ${it.pageId}" } ?: ""})" else ""
             "page view ${page?.id ?: pageId} shows its WebView at ${width}x$height, ${if (isShown) "shown" else "not shown"}$from"
@@ -393,6 +366,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         applyObscuredInsets()
+        syncBottomInset()
         lab { "page view ${page?.id ?: pageId} size ${oldw}x$oldh -> ${w}x$h" }
     }
 
@@ -441,6 +415,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
         lab { "page view ${page?.id ?: pageId} bottom inset ${appliedObscuredInsets.second} -> ${obscuredInsets.second}" }
         appliedObscuredInsets = obscuredInsets
         layOutChildren()
+        syncBottomInset()
         invalidate()
     }
 
@@ -450,7 +425,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
     }
 
     private fun placeHost(width: Int, height: Int) {
-        val bands = PageBands.frame(height, (appliedObscuredInsets.first * resources.displayMetrics.density).roundToInt(), (appliedObscuredInsets.second * resources.displayMetrics.density).roundToInt())
+        val bands = PageBands.frame(height, (appliedObscuredInsets.first * resources.displayMetrics.density).roundToInt(), 0)
         val pageHeight = height - bands.top - bands.bottom
         if (host.isLayoutRequested || host.measuredWidth != width || host.measuredHeight != pageHeight || host.width != width || host.height != pageHeight || host.top != bands.top || host.bottom != bands.top + pageHeight) {
             host.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(pageHeight, MeasureSpec.EXACTLY))
@@ -470,13 +445,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
     }
 
     private fun sendState(state: PageState) {
-        val previousDocument = document.generation
-        val generation = document.saw(state.url, state.isLoading)
-        if (previousDocument != generation) {
-            clearBottomBlur()
-            if (bottomBlurNavigationInset != null) invalidate()
-        }
-        documentChanged(generation)
+        documentChanged(document.saw(state.url, state.isLoading))
         onPageEvent(present(mapOf("name" to "state") + PagePayloads.state(context, state, page?.isPrivate ?: isPrivate)))
         sendTone(state)
     }
@@ -520,7 +489,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        val bands = PageBands.frame(measuredHeight, (appliedObscuredInsets.first * resources.displayMetrics.density).roundToInt(), (appliedObscuredInsets.second * resources.displayMetrics.density).roundToInt())
+        val bands = PageBands.frame(measuredHeight, (appliedObscuredInsets.first * resources.displayMetrics.density).roundToInt(), 0)
         host.measure(
             MeasureSpec.makeMeasureSpec(measuredWidth, MeasureSpec.EXACTLY),
             MeasureSpec.makeMeasureSpec(measuredHeight - bands.top - bands.bottom, MeasureSpec.EXACTLY),
@@ -529,10 +498,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
 
     override fun onVisibilityChanged(changedView: View, visibility: Int) {
         super.onVisibilityChanged(changedView, visibility)
-        if (!isShown) {
-            clearBottomBlur()
-            dismissSummary(animated = false)
-        }
+        if (!isShown) dismissSummary(animated = false)
     }
 
     private fun documentChanged(generation: Long) {
@@ -643,7 +609,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
             density = density,
             bands = bands,
             toneBottomPx = (toneInsets.second * density).roundToInt(),
-            summaryBottomPx = (summaryBottomInset * density).roundToInt(),
+            summaryBottomPx = maxOf((summaryBottomInset * density).roundToInt(), (appliedObscuredInsets.second * density).roundToInt()),
             marginDp = SUMMARY_MARGIN_DP,
             heightShare = SUMMARY_HEIGHT_SHARE,
             minimumHeightDp = SUMMARY_MINIMUM_HEIGHT_DP,

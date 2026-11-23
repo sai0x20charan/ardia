@@ -2605,14 +2605,16 @@ Not audited at all: Compose's `SyncSetupContent` internals inside onboarding.
 - The page under the bar (the owner's decision, 2026-11-16, revised 2026-11-22).
   - **iPhone:** the page runs full screen under the glass bar, and WebKit gets the covered edges as
     `obscuredContentInsets`, so fixed footers and the page's last lines stay above the bar.
-  - **Android:** the WebView stops at the top of the floating controls so fixed footers and the last lines stay
-    tappable. The expanded toolbar gets its full clearance immediately. The folded pill reclaims its share of the
-    viewport once scrolling settles. Fullscreen and search clear the browsing toolbar inset.
-  - **The lower edge on Android:** a live blur of the adjacent WebView extends into the sides and below the toolbar.
-    It feathers in over the last 12 dp of the page and uses a small copy of the rendered page edge to fill the
-    space beyond the viewport. The WebView draws once, and the blur updates from the committed window pixels. It fades into the sampled tone near Android's navigation buttons to preserve icon contrast. Before
-    the first web frame, with reduced transparency, or on a constrained device, the area uses that tone throughout. The controls keep their own surfaces. The existing `bottom_bar_collapses` count
-    tracks fold use. The lab's `blurLayerRenders` counter includes the page edge for rendering cost checks.
+  - **Android:** the WebView runs full height behind the floating bottom controls with no solid background band around them.
+    `PageBottomInset` injects bottom scroll clearance (`padding-bottom` and `scroll-padding-bottom`) and lifts bottom-anchored
+    `position: fixed` controls above the toolbar height, so fixed footers stay tappable and scrolling to the end of the page
+    reveals the page's own background behind the bar. The expanded toolbar gets its full clearance immediately; the folded pill
+    reclaims its share once scrolling settles. Fullscreen, find and search clear the inset.
+  - **The lower edge on Android:** a progressive Chromium `backdrop-filter` blur inside the WebView blurs the real page content
+    behind the bottom bar at full frame rate, feathering smoothly into the page above without mirroring or window readback.
+    At the end of a page, the cleared page background naturally shows as a solid colour through the blur. With reduced
+    transparency or on a constrained device, the blur overlay turns off while keeping the bottom clearance. The existing
+    `bottom_bar_collapses` count tracks fold use.
   - Both platforms receive `obscuredInsets` and `toneInsets`. Android's `PageView` lays out the WebView between
     the bands, samples tone at its visible edge, and includes the bands' colours when composing deck snapshots.
   - **The tone under the bars on Android** (2026-11-22): each sampled edge also keeps its strip's commonest colour,
