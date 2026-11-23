@@ -167,7 +167,7 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
   const obscured = underBar ? { top: insets.top, bottom: coveredBottom } : undefined;
   const bottomInsetTransitionMs = android && underBar && collapse.collapsed && folds && !reduceMotion && !barCleared ? 300 : undefined;
   const pageCovered = useBrowse((s) => s.covered === tab.id || s.sheet !== null);
-  const blurVisible = !pageCovered && !menu.mounted && !reader && !pressing && !tabsMenu;
+  const blurVisible = !pageCovered && !menu.mounted && !reader.shown && !pressing && !tabsMenu;
   const bottomBlurNavigationInset = android && underBar && blurVisible && !reduceTransparency && coveredBottom > 0 ? insets.bottom : undefined;
   const summaryBottomInset = design === "material" ? materialSummaryBottom : undefined;
   const painted = useSharedValue(false);
