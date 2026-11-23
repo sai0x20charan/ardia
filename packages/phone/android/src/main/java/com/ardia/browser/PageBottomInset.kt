@@ -65,6 +65,21 @@ internal object PageBottomInset {
     return { r: Math.round(r), g: Math.round(g), b: Math.round(b), a };
   };
 
+  const pageGlassTint = () => {
+    const bodyBg = document.body ? parseRgba(getComputedStyle(document.body).backgroundColor) : null;
+    const rootBg = document.documentElement ? parseRgba(getComputedStyle(document.documentElement).backgroundColor) : null;
+    const chosen = bodyBg && bodyBg.a > 0.1 ? bodyBg : rootBg && rootBg.a > 0.1 ? rootBg : null;
+    if (chosen) {
+      const luma = (0.299 * chosen.r + 0.587 * chosen.g + 0.114 * chosen.b) / 255;
+      if (luma < 0.45) return { mid: "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.42)", bottom: "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.54)" };
+      return { mid: "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.44)", bottom: "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.58)" };
+    }
+    const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    return dark
+      ? { mid: "rgba(18,18,22,0.42)", bottom: "rgba(18,18,22,0.54)" }
+      : { mid: "rgba(255,255,255,0.44)", bottom: "rgba(255,255,255,0.58)" };
+  };
+
   const findBarSurface = (el, minWidth) => {
     let current = el;
     for (let depth = 0; depth < 4 && current; depth++) {
@@ -129,8 +144,9 @@ internal object PageBottomInset {
       if (host) host.remove();
       return;
     }
-    const feather = Math.max(18, Math.round(px * 0.3));
+    const feather = Math.max(14, Math.round(px * 0.2));
     const totalHeight = px + feather;
+    const tint = pageGlassTint();
     if (!host) {
       host = document.createElement("div");
       host.id = BLUR_ID;
@@ -144,22 +160,33 @@ internal object PageBottomInset {
       host.style.setProperty("overflow", "hidden", "important");
       host.style.setProperty("transform", "translateZ(0)", "important");
       const layers = [
-        { blur: "4px", mask: "linear-gradient(to bottom,transparent 0%,black 35%,black 100%)" },
-        { blur: "10px", mask: "linear-gradient(to bottom,transparent 20%,black 65%,black 100%)" },
-        { blur: "20px", mask: "linear-gradient(to bottom,transparent 42%,black 100%)" },
+        { filter: "blur(2px) saturate(1.15)", mask: "linear-gradient(to bottom,transparent 0%,black 12%,black 24%,transparent 36%)" },
+        { filter: "blur(6px) saturate(1.3)", mask: "linear-gradient(to bottom,transparent 8%,black 20%,black 32%,transparent 44%)" },
+        { filter: "blur(14px) saturate(1.5)", mask: "linear-gradient(to bottom,transparent 16%,black 28%,black 42%,transparent 54%)" },
+        { filter: "blur(32px) saturate(1.8)", mask: "linear-gradient(to bottom,transparent 22%,black 40%,black 100%)" },
       ];
       for (const spec of layers) {
         const layer = document.createElement("div");
         layer.style.setProperty("position", "absolute", "important");
         layer.style.setProperty("inset", "0", "important");
         layer.style.setProperty("pointer-events", "none", "important");
-        setBackdrop(layer, "blur(" + spec.blur + ")");
+        setBackdrop(layer, spec.filter);
         setMask(layer, spec.mask);
         host.appendChild(layer);
       }
+      const scrim = document.createElement("div");
+      scrim.dataset.role = "glassTint";
+      scrim.style.setProperty("position", "absolute", "important");
+      scrim.style.setProperty("inset", "0", "important");
+      scrim.style.setProperty("pointer-events", "none", "important");
+      host.appendChild(scrim);
       root.appendChild(host);
     } else if (host.parentNode !== root) {
       root.appendChild(host);
+    }
+    const scrim = host.querySelector('[data-role="glassTint"]');
+    if (scrim) {
+      scrim.style.setProperty("background", "linear-gradient(to bottom,transparent 14%," + tint.mid + " 42%," + tint.bottom + " 100%)", "important");
     }
     host.style.setProperty("transition", animate ? "height 260ms cubic-bezier(0.2,0,0,1)" : "none", "important");
     host.style.setProperty("height", totalHeight + "px", "important");
