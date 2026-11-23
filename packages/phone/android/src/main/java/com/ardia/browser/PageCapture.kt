@@ -66,16 +66,21 @@ internal object PageCapture {
         view.getLocationInWindow(location)
         val source = Rect(region).apply { offset(location[0], location[1]) }
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val copied = suspendCancellableCoroutine { continuation ->
+        return suspendCancellableCoroutine { continuation ->
             try {
-                PixelCopy.request(window, source, bitmap, { result -> continuation.resume(result == PixelCopy.SUCCESS) }, Handler(Looper.getMainLooper()))
+                PixelCopy.request(window, source, bitmap, { result ->
+                    if (result == PixelCopy.SUCCESS) {
+                        continuation.resume(bitmap) { _, unclaimed, _ -> unclaimed?.recycle() }
+                    } else {
+                        bitmap.recycle()
+                        continuation.resume(null)
+                    }
+                }, Handler(Looper.getMainLooper()))
             } catch (error: IllegalArgumentException) {
-                continuation.resume(false)
+                bitmap.recycle()
+                continuation.resume(null)
             }
         }
-        if (copied) return bitmap
-        bitmap.recycle()
-        return null
     }
 
     fun isBlank(bitmap: Bitmap, blackIsBlank: Boolean): Boolean = CaptureCheck.isBlank(sample(bitmap, PROBE_GRID), blackIsBlank)

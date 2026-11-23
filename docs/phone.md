@@ -2609,8 +2609,8 @@ Not audited at all: Compose's `SyncSetupContent` internals inside onboarding.
     tappable. The expanded toolbar gets its full clearance immediately. The folded pill reclaims its share of the
     viewport once scrolling settles. Fullscreen and search clear the browsing toolbar inset.
   - **The lower edge on Android:** a live blur of the adjacent WebView extends into the sides and below the toolbar.
-    It feathers in over the last 12 dp of the page and uses the reflected page edge to fill the space beyond the
-    viewport. It fades into the sampled tone near Android's navigation buttons to preserve icon contrast. Before
+    It feathers in over the last 12 dp of the page and uses a small copy of the rendered page edge to fill the
+    space beyond the viewport. The WebView draws once, and the blur updates from the committed window pixels. It fades into the sampled tone near Android's navigation buttons to preserve icon contrast. Before
     the first web frame, with reduced transparency, or on a constrained device, the area uses that tone throughout. The controls keep their own surfaces. The existing `bottom_bar_collapses` count
     tracks fold use. The lab's `blurLayerRenders` counter includes the page edge for rendering cost checks.
   - Both platforms receive `obscuredInsets` and `toneInsets`. Android's `PageView` lays out the WebView between

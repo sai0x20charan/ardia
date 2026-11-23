@@ -94,7 +94,10 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
         val web = PageDrawnWatch.webViewIn(host)
         val x = web?.scrollX ?: 0
         val y = web?.scrollY ?: 0
-        if (web === observedWeb && (x != observedScrollX || y != observedScrollY)) insetSettlement.scrolled(SystemClock.uptimeMillis())
+        if (web === observedWeb && (x != observedScrollX || y != observedScrollY)) {
+            insetSettlement.scrolled(SystemClock.uptimeMillis())
+            if (bottomBlurNavigationInset != null) invalidate()
+        }
         observedWeb = web
         observedScrollX = x
         observedScrollY = y
@@ -235,25 +238,23 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
 
     private fun clearBottomBlur() {
         bottomBlur?.clear()
-        bottomBlur = null
     }
 
     private fun drawBottomBlur(canvas: Canvas, bandHeight: Int) {
         val navigationInset = bottomBlurNavigationInset
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || navigationInset == null ||
+        val web = page?.view?.value as? WebView
+        val running = scope
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || navigationInset == null || running == null || web?.parent !== host ||
             !canvas.isHardwareAccelerated || bandHeight <= 0 || !hostAtRest || width <= 0 ||
             drawn.stage != PageDrawnWatch.Stage.Drawn || summaryLayer?.visibility == View.VISIBLE ||
-            LookBudget.isDegraded(context) || host.childCount == 0 || page?.view?.value?.parent !== host
+            LookBudget.isDegraded(context) || web.width != width || web.height != host.height
         ) {
             clearBottomBlur()
             return
         }
         val density = resources.displayMetrics.density
-        val blur = bottomBlur ?: PageBottomBlur(density).also { bottomBlur = it }
-        val time = drawingTime
-        blur.draw(canvas, width, host.top, host.bottom, bandHeight, (navigationInset * density).roundToInt()) { recording ->
-            drawChild(recording, host, time)
-        }
+        val blur = bottomBlur ?: PageBottomBlur(density, ::invalidate).also { bottomBlur = it }
+        blur.draw(canvas, web, running, host.top, host.bottom, bandHeight, (navigationInset * density).roundToInt())
     }
 
     init {
@@ -466,7 +467,13 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
     }
 
     private fun sendState(state: PageState) {
-        documentChanged(document.saw(state.url, state.isLoading))
+        val previousDocument = document.generation
+        val generation = document.saw(state.url, state.isLoading)
+        if (previousDocument != generation) {
+            clearBottomBlur()
+            if (bottomBlurNavigationInset != null) invalidate()
+        }
+        documentChanged(generation)
         onPageEvent(present(mapOf("name" to "state") + PagePayloads.state(context, state, page?.isPrivate ?: isPrivate)))
         sendTone(state)
     }
