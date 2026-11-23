@@ -23,7 +23,7 @@ export type FrostSourceProps = ViewProps & { name: string; children?: ReactNode 
 export type FrostVariant = "bar" | "sheet" | "glass" | "thin";
 
 export type FrostProps = ViewProps &
-  LookColors & { source: string; name?: string; variant?: FrostVariant; sampleOffsetY?: number; cornerRadius?: number; dark?: boolean; reduceTransparency?: boolean; children?: ReactNode };
+  LookColors & { source: string; name?: string; variant?: FrostVariant; cornerRadius?: number; dark?: boolean; reduceTransparency?: boolean; children?: ReactNode };
 
 export type GlassShape = "capsule" | "circle" | "rounded";
 

@@ -3,7 +3,6 @@ import { countRender } from "../../state/app/interactionPerf";
 import { Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
-import { Frost } from "@ardia/phone-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BAR_SHOWN, barShown, bottomBarCollapses, followScroll, obscuredBottom, pageInsets } from "../../lib/barCollapse";
 import type { Design } from "../../lib/design";
@@ -41,8 +40,6 @@ import {
   FrostSource,
   GlassSource,
   PAGE_FROST,
-  FadeView,
-  useReduceTransparency,
   pageReportsDrawn,
   useDesign,
   usePageUnderBars,
@@ -150,27 +147,11 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
   const folds = squeeze === null;
   const staged = design === "redesigned" && searchStageIsNative();
   useEffect(() => (staged && !collapse.hidden ? reportBarPill() : undefined), [staged, collapse.hidden]);
+  const layout = underBar ? { pageBottom: 0, toneBottom: design === "material" ? 0 : barSlotHeight } : pageInsets(collapse.collapses, barSlotHeight, browseLayout.pageOverlap);
   const fullscreen = usePages((s) => s.fullscreen[tab.id] ?? false);
-  const android = Platform.OS === "android";
-  const barCleared = fullscreen || finding || searching;
-  const barCenter = barCenterFromBottom(insets.bottom, design);
-  const barBlurHeight = design === "material" ? insets.bottom + materialBottomBar.inset : barCenter - floatingBarLayout.control / 2;
-  const reduceTransparency = useReduceTransparency();
-  const materialPillBottom = insets.bottom + materialBottomBar.inset + materialBarPill.height;
-  const floatingPillBottom = barCenter - floatingBarLayout.control / 2 + hostPillLayout.height;
-  const collapsedBarBottom = design === "material" ? materialPillBottom : floatingPillBottom;
-  let androidBarBottom = barSlotHeight;
-  if (barCleared) androidBarBottom = 0;
-  else if (collapse.hidden) androidBarBottom = insets.bottom;
-  else if (collapse.collapsed && folds) androidBarBottom = collapsedBarBottom;
-  const layout = underBar ? { pageBottom: 0, toneBottom: android || design === "material" ? 0 : barSlotHeight }
-    : android ? { pageBottom: androidBarBottom, toneBottom: 0 }
-    : pageInsets(collapse.collapses, barSlotHeight, browseLayout.pageOverlap);
-  const coveredBottom = android ? androidBarBottom : obscuredBottom({ insetsScroll: true, bar: barSlotHeight, collapses: collapse.collapses, cleared: barCleared });
+  const coveredBottom = obscuredBottom({ insetsScroll: Platform.OS === "ios", bar: barSlotHeight, collapses: collapse.collapses, cleared: fullscreen || finding || searching });
   const obscured = underBar ? { top: insets.top, bottom: coveredBottom } : undefined;
-  const reduceMotion = useReduceMotion();
-  const bottomInsetTransitionMs = android && underBar && collapse.collapsed && !reduceMotion && !barCleared ? 300 : undefined;
-  const materialSummaryBottom = fullscreen || searching ? insets.bottom : collapse.collapsed ? materialPillBottom : barSlotHeight;
+  const materialSummaryBottom = fullscreen || searching ? insets.bottom : collapse.collapsed ? insets.bottom + materialBottomBar.inset + materialBarPill.height : barSlotHeight;
   const summaryBottomInset = design === "material" ? materialSummaryBottom : undefined;
   const painted = useSharedValue(false);
   useEffect(() => {
@@ -187,6 +168,7 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
     if (id) switchToNeighbour(id);
   }, []);
   const incognito = useIncognito();
+  const reduceMotion = useReduceMotion();
   const pulls = design === "redesigned";
   const tracks = pulls && !reduceMotion;
   useEffect(() => {
@@ -194,6 +176,7 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
     armDeckPull(tab.id, reduceMotion);
     return () => disarmDeckPull(tab.id, deckPullSettled);
   }, [pulls, reduceMotion, tab.id]);
+  const barCenter = barCenterFromBottom(insets.bottom, design);
   const barTop = barCenter + floatingBarLayout.control / 2;
   const barShift = usePullBarShift(barTop, barCenter - redesignedBarCenterFromBottom(insets.bottom, Platform.OS));
   const swipesUp = !searching && !collapse.hidden && !(pulls && collapse.collapsed);
@@ -239,7 +222,7 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
         <Animated.View style={[StyleSheet.absoluteFill, styles.outgoing, { backgroundColor: theme.canvas }, pager.outgoing]}>
           {underBar ? null : <Animated.View testID="pageStatusStrip" style={[{ height: insets.top }, statusStyle]} />}
           <View testID="pageArea" style={[styles.page, { marginBottom: layout.pageBottom }]}>
-            <PageSurface key={tab.id} tab={tab} toneBottom={layout.toneBottom} obscured={obscured} bottomInsetTransitionMs={bottomInsetTransitionMs} summaryBottomInset={summaryBottomInset} pinsSafeArea={pulls ? true : undefined} />
+            <PageSurface key={tab.id} tab={tab} toneBottom={layout.toneBottom} obscured={obscured} summaryBottomInset={summaryBottomInset} pinsSafeArea={pulls ? true : undefined} />
             <PageCover key={`${tab.id}:cover`} tab={tab} />
             <PageFailureView key={`${tab.id}:failure`} tabId={tab.id} />
           </View>
@@ -252,11 +235,6 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
         <PageProgressLine tabId={tab.id} top={insets.top} />
         </PageStack>
         </FrostSource>
-        {android && underBar && !barCleared && !collapse.hidden && !reduceTransparency && barBlurHeight > 0 ? (
-          <FadeView testID="pageBarBottomBlur" pointerEvents="none" top={{ length: barBlurHeight }} style={[styles.bottomBlur, { height: barBlurHeight }]}>
-            <Frost source={PAGE_FROST} variant="thin" dark={barDark} sampleOffsetY={coveredBottom} pointerEvents="none" style={StyleSheet.absoluteFill} />
-          </FadeView>
-        ) : null}
         <GlassSource name={PAGE_FROST}>
         {materialBarHosted && design === "material" ? null : (
         <GestureDetector gesture={barGesture}>
@@ -468,7 +446,6 @@ const styles = StyleSheet.create({
   outgoing: { overflow: "hidden" },
   page: { flex: 1 },
   statusOver: { position: "absolute", left: 0, right: 0, top: 0 },
-  bottomBlur: { position: "absolute", left: 0, right: 0, bottom: 0 },
   bar: { position: "absolute", left: 0, right: 0, bottom: 0 },
   replacedBar: { opacity: 0 },
   controls: { position: "absolute", left: 0, right: 0 },

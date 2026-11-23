@@ -1591,7 +1591,6 @@ open class FrostView(context: Context, appContext: AppContext) : LookView(contex
     var source: String? = null
     var name: String? = null
     var variant: String? = null
-    var sampleOffsetY: Float = 0f
 
     private val number = FrostRefresh.nextNumber()
 
@@ -1694,7 +1693,7 @@ open class FrostView(context: Context, appContext: AppContext) : LookView(contex
         layerHeight = 0
     }
 
-    private fun effectivePageMode(): FrostSources.PageMode = if (pageLive() || sampleOffsetY > 0f) FrostSources.PageMode.Live else FrostSources.pageMode
+    private fun effectivePageMode(): FrostSources.PageMode = if (pageLive()) FrostSources.PageMode.Live else FrostSources.pageMode
 
     internal fun wantsSource(): Boolean {
         if (!canBlur()) return false
@@ -1758,7 +1757,7 @@ open class FrostView(context: Context, appContext: AppContext) : LookView(contex
             val recording = layerNode.beginRecording()
             try {
                 recording.scale(1f / scale, 1f / scale)
-                recording.translate(dx + margin, dy + margin + sampleOffsetY * density)
+                recording.translate(dx + margin, dy + margin)
                 from.node?.let(recording::drawRenderNode)
             } finally {
                 layerNode.endRecording()
@@ -1772,10 +1771,6 @@ open class FrostView(context: Context, appContext: AppContext) : LookView(contex
             paint.style = Paint.Style.FILL
             paint.color = style.tint.resolve(dark).toArgb()
             canvas.drawPath(clip, paint)
-        } else if (sampleOffsetY > 0f) {
-            if (blurNode != null) forgetLayer()
-            removeCallbacks(refresh)
-            return
         } else if (choice.path == FrostPage.Path.Tinted && from != null && tintedFill(canvas, from, style, dark)) {
             if (blurNode != null) forgetLayer()
             removeCallbacks(refresh)
