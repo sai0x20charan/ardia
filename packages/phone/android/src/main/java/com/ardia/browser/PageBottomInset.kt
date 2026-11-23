@@ -64,15 +64,6 @@ internal object PageBottomInset {
     return { r: Math.round(r), g: Math.round(g), b: Math.round(b), a };
   };
 
-  const pageTintColor = () => {
-    const bodyBg = document.body ? parseRgba(getComputedStyle(document.body).backgroundColor) : null;
-    const rootBg = document.documentElement ? parseRgba(getComputedStyle(document.documentElement).backgroundColor) : null;
-    const chosen = bodyBg && bodyBg.a > 0.1 ? bodyBg : rootBg && rootBg.a > 0.1 ? rootBg : null;
-    if (chosen) return "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.62)";
-    const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    return dark ? "rgba(15,15,15,0.62)" : "rgba(255,255,255,0.62)";
-  };
-
   const findBarSurface = (el, minWidth) => {
     let current = el;
     for (let depth = 0; depth < 4 && current; depth++) {
@@ -136,9 +127,8 @@ internal object PageBottomInset {
       if (host) host.remove();
       return;
     }
-    const feather = Math.max(20, Math.round(px * 0.28));
+    const feather = Math.max(18, Math.round(px * 0.3));
     const totalHeight = px + feather;
-    const tint = pageTintColor();
     if (!host) {
       host = document.createElement("div");
       host.id = BLUR_ID;
@@ -152,9 +142,9 @@ internal object PageBottomInset {
       host.style.setProperty("overflow", "hidden", "important");
       host.style.setProperty("transform", "translateZ(0)", "important");
       const layers = [
-        { blur: "12px", mask: "linear-gradient(to bottom,transparent 0%,black 32%,black 100%)" },
-        { blur: "28px", mask: "linear-gradient(to bottom,transparent 16%,black 58%,black 100%)" },
-        { blur: "48px saturate(1.25)", mask: "linear-gradient(to bottom,transparent 30%,black 85%,black 100%)" },
+        { blur: "4px", mask: "linear-gradient(to bottom,transparent 0%,black 35%,black 100%)" },
+        { blur: "10px", mask: "linear-gradient(to bottom,transparent 20%,black 65%,black 100%)" },
+        { blur: "20px", mask: "linear-gradient(to bottom,transparent 42%,black 100%)" },
       ];
       for (const spec of layers) {
         const layer = document.createElement("div");
@@ -165,19 +155,9 @@ internal object PageBottomInset {
         setMask(layer, spec.mask);
         host.appendChild(layer);
       }
-      const scrim = document.createElement("div");
-      scrim.dataset.role = "tint";
-      scrim.style.setProperty("position", "absolute", "important");
-      scrim.style.setProperty("inset", "0", "important");
-      scrim.style.setProperty("pointer-events", "none", "important");
-      host.appendChild(scrim);
       root.appendChild(host);
     } else if (host.parentNode !== root) {
       root.appendChild(host);
-    }
-    const scrim = host.querySelector('[data-role="tint"]');
-    if (scrim) {
-      scrim.style.setProperty("background", "linear-gradient(to bottom,transparent 0%," + tint + " 42%," + tint + " 100%)", "important");
     }
     host.style.setProperty("height", totalHeight + "px", "important");
   };
