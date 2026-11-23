@@ -169,6 +169,15 @@ internal object PageBottomInset {
     state.lifted.delete(el);
   };
 
+  const isBottomOverlay = (el, style, height) => {
+    if (style.position === "fixed") return true;
+    if (style.position !== "absolute" || style.bottom === "auto") return false;
+    const parent = el.offsetParent || el.parentElement;
+    if (!parent) return true;
+    const parentRect = parent.getBoundingClientRect();
+    return parentRect.height >= height * 0.75 && parentRect.bottom >= height - 12 && parentRect.bottom <= height + 12;
+  };
+
   const collectFixedCandidates = (px) => {
     const candidates = new Set();
     for (const [el] of Array.from(state.lifted.entries())) {
@@ -182,7 +191,7 @@ internal object PageBottomInset {
     const width = window.innerWidth;
     const height = window.innerHeight;
     if (width <= 0 || height <= 0) return candidates;
-    const xs = [0.1, 0.3, 0.5, 0.7, 0.9];
+    const xs = [0.1, 0.3, 0.5, 0.7, 0.9, 0.94];
     const ys = [height - 6, height - Math.max(18, Math.round(px * 0.5)), height - Math.max(12, px - 6)];
     const visited = new Set();
     for (const fy of ys) {
@@ -194,8 +203,8 @@ internal object PageBottomInset {
           while (node && node !== document.body && node !== document.documentElement && !visited.has(node)) {
             visited.add(node);
             if (node.nodeType === 1 && node.id !== APRON_ID) {
-              const pos = getComputedStyle(node).position;
-              if (pos === "fixed") candidates.add(node);
+              const style = getComputedStyle(node);
+              if (isBottomOverlay(node, style, height)) candidates.add(node);
             }
             node = node.parentElement;
           }
@@ -218,12 +227,13 @@ internal object PageBottomInset {
       if (el.id === APRON_ID) continue;
       const existing = state.lifted.get(el);
       const style = getComputedStyle(el);
-      if (style.position !== "fixed" || style.display === "none" || style.visibility === "hidden" || parseFloat(style.opacity) === 0 || style.bottom === "auto") {
+      if (!isBottomOverlay(el, style, height) || style.display === "none" || style.visibility === "hidden" || parseFloat(style.opacity) === 0 || style.bottom === "auto") {
         if (existing) restoreElement(el, existing);
         continue;
       }
       const rect = el.getBoundingClientRect();
-      if (rect.width <= 0 || rect.height <= 0 || rect.height >= height * 0.45) {
+      const maxHeight = rect.width < width * 0.35 ? height * 0.6 : height * 0.45;
+      if (rect.width <= 0 || rect.height <= 0 || rect.height >= maxHeight) {
         if (existing) restoreElement(el, existing);
         continue;
       }
@@ -272,7 +282,7 @@ internal object PageBottomInset {
         entry.shift = px;
         state.lifted.set(el, entry);
       }
-      if (!apronSurface && baseBottom <= 8 && rect.width >= width * 0.9) {
+      if (!apronSurface && style.position === "fixed" && baseBottom <= 8 && rect.width >= width * 0.9) {
         apronSurface = findBarSurface(el, width * 0.9);
       }
     }
