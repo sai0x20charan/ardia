@@ -17,6 +17,7 @@ internal object PageBottomInset {
     insetDp: 0,
     viewHeightDp: 0,
     blurEnabled: false,
+    lastPx: 0,
     appliedPadding: 0,
     hadBodyPadding: false,
     origBodyPadding: "",
@@ -86,7 +87,7 @@ internal object PageBottomInset {
     return null;
   };
 
-  const ensureApron = (px, surface) => {
+  const ensureApron = (px, surface, animate) => {
     const root = document.documentElement;
     if (!root) return;
     let apron = document.getElementById(APRON_ID);
@@ -109,6 +110,7 @@ internal object PageBottomInset {
     } else if (apron.parentNode !== root) {
       root.appendChild(apron);
     }
+    apron.style.setProperty("transition", animate ? "height 260ms cubic-bezier(0.2,0,0,1)" : "none", "important");
     apron.style.setProperty("height", (px + 1) + "px", "important");
     apron.style.setProperty("background-color", surface.backgroundColor, "important");
     if (surface.backdropFilter && state.blurEnabled) {
@@ -119,7 +121,7 @@ internal object PageBottomInset {
     }
   };
 
-  const ensureBlur = (px, apronActive) => {
+  const ensureBlur = (px, apronActive, animate) => {
     const root = document.documentElement;
     if (!root) return;
     let host = document.getElementById(BLUR_ID);
@@ -159,6 +161,7 @@ internal object PageBottomInset {
     } else if (host.parentNode !== root) {
       root.appendChild(host);
     }
+    host.style.setProperty("transition", animate ? "height 260ms cubic-bezier(0.2,0,0,1)" : "none", "important");
     host.style.setProperty("height", totalHeight + "px", "important");
   };
 
@@ -212,6 +215,8 @@ internal object PageBottomInset {
     if (el.isConnected) {
       if (entry.hadInline) el.style.setProperty("bottom", entry.origBottom, entry.origPriority);
       else el.style.removeProperty("bottom");
+      if (entry.hadTransition) el.style.setProperty("transition", entry.origTransition, entry.origTransitionPriority);
+      else el.style.removeProperty("transition");
     }
     state.lifted.delete(el);
   };
@@ -252,7 +257,7 @@ internal object PageBottomInset {
     return candidates;
   };
 
-  const applyFixed = (px) => {
+  const applyFixed = (px, animate) => {
     if (px <= 0) {
       for (const [el, entry] of Array.from(state.lifted.entries())) restoreElement(el, entry);
       return null;
@@ -303,9 +308,18 @@ internal object PageBottomInset {
         origBottom: el.style.getPropertyValue("bottom"),
         origPriority: el.style.getPropertyPriority("bottom"),
         hadInline: el.style.getPropertyValue("bottom") !== "",
+        origTransition: el.style.getPropertyValue("transition"),
+        origTransitionPriority: el.style.getPropertyPriority("transition"),
+        hadTransition: el.style.getPropertyValue("transition") !== "",
         shift: 0,
       };
       if (entry.shift !== px) {
+        if (animate && existing) {
+          el.style.setProperty("transition", "bottom 260ms cubic-bezier(0.2,0,0,1)", "important");
+        } else if (!existing) {
+          if (entry.hadTransition) el.style.setProperty("transition", entry.origTransition, entry.origTransitionPriority);
+          else el.style.removeProperty("transition");
+        }
         el.style.setProperty("bottom", (baseBottom + px) + "px", "important");
         entry.shift = px;
         state.lifted.set(el, entry);
@@ -320,6 +334,7 @@ internal object PageBottomInset {
   const applyAll = () => {
     try {
       const px = insetCss();
+      const animate = state.lastPx > 0 && px > 0 && state.lastPx !== px;
       const root = document.documentElement;
       if (root) {
         if (px > 0) root.style.setProperty("--ardia-bottom-inset", px + "px");
@@ -333,9 +348,10 @@ internal object PageBottomInset {
         }
       }
       applyBody(px);
-      const apronSurface = applyFixed(px);
-      ensureApron(px, apronSurface);
-      ensureBlur(px, Boolean(apronSurface));
+      const apronSurface = applyFixed(px, animate);
+      ensureApron(px, apronSurface, animate);
+      ensureBlur(px, Boolean(apronSurface), animate);
+      state.lastPx = px;
     } catch (_) {}
   };
 

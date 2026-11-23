@@ -387,19 +387,7 @@ class PageView(context: Context, appContext: AppContext) : ExpoView(context, app
             cancelInsetSettlement()
             return
         }
-        val web = PageDrawnWatch.webViewIn(host)
-        val defers = bottomInsetTransitionMs > 0 && appliedObscuredInsets.first == obscuredInsets.first &&
-            obscuredInsets.second > 0 && appliedObscuredInsets.second > obscuredInsets.second && page?.id == pageId && web != null && isAttachedToWindow
-        if (!defers) {
-            applyObscuredInsets()
-            return
-        }
-        if (insetPage === page && insetWeb === web && insetSettlement.target == obscuredInsets.second) return
-        removeCallbacks(settleInsets)
-        insetPage = page
-        insetWeb = web
-        insetSettlement.changed(obscuredInsets.second, SystemClock.uptimeMillis())
-        postDelayed(settleInsets, bottomInsetTransitionMs.toLong())
+        applyObscuredInsets()
     }
 
     private fun cancelInsetSettlement() {
