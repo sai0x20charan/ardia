@@ -76,7 +76,7 @@ const screen = () => {
   );
 };
 
-onAndroid("the material page bar has a rounded capsule with tabs, centered search and add above the navigation inset", () => {
+onAndroid("the material page bar has an address capsule between tabs and add above the navigation inset", () => {
   const root = screen();
   expect(root.root.findAll((found) => found.type === FloatingBar)).toHaveLength(0);
   expect(root.root.findAll((found) => found.type === BottomBar)).toHaveLength(0);
@@ -92,7 +92,7 @@ onAndroid("the material page bar has a rounded capsule with tabs, centered searc
   expect(root.root.findAll((found) => found.props.sampleOffsetY === barHeight(24, "material")).length).toBeGreaterThan(0);
   expect(node(root, "pageBar")!.props.pointerEvents).toBe("box-none");
   expect(flat(node(root, "pageBar")).backgroundColor).toBeUndefined();
-  expect(flat(node(root, "materialPageBar"))).toMatchObject({ height: 64, borderRadius: 9999, backgroundColor: LIGHT.surfaceContainer });
+  expect(flat(node(root, "materialPageBar"))).toMatchObject({ height: 64, backgroundColor: "transparent", elevation: 0 });
   expect(flat(node(root, "materialAddressField"))).toMatchObject({ height: 48, borderRadius: 9999, backgroundColor: LIGHT.surfaceContainerHigh });
   for (const id of ["materialBarPlus", "materialBarTabs"]) {
     expect(flat(node(root, id))).toMatchObject({ width: 48, height: 48 });
@@ -378,7 +378,7 @@ onAndroid.each(["light", "dark"] as const)("Incognito keeps the page search bar 
     { flushTimers: false },
   );
   expect(flat(node(root, "materialAddressField")).backgroundColor).toBe("#000000");
-  expect(flat(node(root, "materialPageBar")).backgroundColor).toBe("#000000");
+  expect(flat(node(root, "materialPageBar")).backgroundColor).toBe("transparent");
   expect(flat(node(root, "materialBarHost")).color).toBe(SEEDED_SCHEMES.ardia.dark.onSurface);
   unmount(root);
   act(() => setPreference("schemeChoice", previous));
@@ -387,7 +387,7 @@ onAndroid.each(["light", "dark"] as const)("Incognito keeps the page search bar 
 onAndroid("a wallpaper scheme change re-themes the bar", () => {
   const root = screen();
   act(() => setDynamicScheme({ light: { ...SEEDED_SCHEMES.blue.light }, dark: SEEDED_SCHEMES.blue.dark }));
-  expect(flat(node(root, "materialPageBar")).backgroundColor).toBe(SEEDED_SCHEMES.blue.light.surfaceContainer);
+  expect(flat(node(root, "materialPageBar")).backgroundColor).toBe("transparent");
   expect(flat(node(root, "materialAddressField")).backgroundColor).toBe(SEEDED_SCHEMES.blue.light.surfaceContainerHigh);
   unmount(root);
 });
