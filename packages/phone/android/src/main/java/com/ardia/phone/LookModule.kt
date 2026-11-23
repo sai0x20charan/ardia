@@ -232,6 +232,7 @@ class LookModule : Module() {
             Prop("source") { view: FrostView, value: String? -> view.source = value }
             Prop("name") { view: FrostView, value: String? -> view.name = value }
             Prop("variant") { view: FrostView, value: String? -> view.variant = value }
+            Prop("sampleOffsetY") { view: FrostView, value: Float? -> view.sampleOffsetY = value ?: 0f }
             Prop("cornerRadius") { view: FrostView, value: Float? -> view.cornerRadius = value ?: 0f }
             Prop("color") { view: FrostView, value: String? -> view.color = value }
             Prop("themeColors") { view: FrostView, value: List<String>? -> view.themeColors = value }

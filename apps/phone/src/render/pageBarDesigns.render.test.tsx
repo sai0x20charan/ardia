@@ -155,8 +155,8 @@ test("Android reserves clearance for the expanded bar and the collapsed pill whi
   const root = page("redesigned", tab);
   expect(pageView(root).props.bottomInsetTransitionMs).toBeUndefined();
   expect(bottom(root)).toBe(75 + lift);
-  const fade = host(root, "pageBarFade");
-  expect(fade?.props.pointerEvents).toBe(android ? "none" : undefined);
+  const blur = host(root, "pageBarBottomBlur");
+  expect(blur?.props.pointerEvents).toBe(android ? "none" : undefined);
   scrolled("down");
   if (android) {
     expect(bottom(root)).toBeGreaterThan(34);
