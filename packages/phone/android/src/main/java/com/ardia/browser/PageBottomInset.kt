@@ -50,21 +50,38 @@ internal object PageBottomInset {
     el.style.setProperty("backdrop-filter", filter, "important");
   };
 
-  const parseAlpha = (color) => {
-    if (!color || color === "transparent") return 0;
+  const parseRgba = (color) => {
+    if (!color || color === "transparent") return null;
     const match = /^rgba?\(([^)]+)\)$/i.exec(color.trim());
-    if (!match) return 1;
+    if (!match) return null;
     const parts = match[1].split(/[,\s/]+/).filter(Boolean);
-    if (parts.length < 4) return 1;
-    const alpha = parseFloat(parts[3]);
-    return isFinite(alpha) ? alpha : 0;
+    if (parts.length < 3) return null;
+    const r = parseFloat(parts[0]);
+    const g = parseFloat(parts[1]);
+    const b = parseFloat(parts[2]);
+    const a = parts.length >= 4 ? parseFloat(parts[3]) : 1;
+    if (!isFinite(r) || !isFinite(g) || !isFinite(b) || !isFinite(a)) return null;
+    return { r: Math.round(r), g: Math.round(g), b: Math.round(b), a };
   };
 
-  const findBarBackground = (el, minWidth) => {
+  const pageTintColor = () => {
+    const bodyBg = document.body ? parseRgba(getComputedStyle(document.body).backgroundColor) : null;
+    const rootBg = document.documentElement ? parseRgba(getComputedStyle(document.documentElement).backgroundColor) : null;
+    const chosen = bodyBg && bodyBg.a > 0.1 ? bodyBg : rootBg && rootBg.a > 0.1 ? rootBg : null;
+    if (chosen) return "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.62)";
+    const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    return dark ? "rgba(15,15,15,0.62)" : "rgba(255,255,255,0.62)";
+  };
+
+  const findBarSurface = (el, minWidth) => {
     let current = el;
-    for (let depth = 0; depth < 3 && current; depth++) {
-      const bg = getComputedStyle(current).backgroundColor;
-      if (parseAlpha(bg) >= 0.75) return bg;
+    for (let depth = 0; depth < 4 && current; depth++) {
+      const style = getComputedStyle(current);
+      const rgba = parseRgba(style.backgroundColor);
+      const filter = style.backdropFilter && style.backdropFilter !== "none" ? style.backdropFilter : style.webkitBackdropFilter && style.webkitBackdropFilter !== "none" ? style.webkitBackdropFilter : "";
+      if ((rgba && rgba.a >= 0.75) || (filter && rgba && rgba.a >= 0.3)) {
+        return { backgroundColor: style.backgroundColor, backdropFilter: filter };
+      }
       let next = null;
       for (let i = 0; i < current.children.length; i++) {
         const child = current.children[i];
@@ -78,11 +95,11 @@ internal object PageBottomInset {
     return null;
   };
 
-  const ensureApron = (px, color) => {
+  const ensureApron = (px, surface) => {
     const root = document.documentElement;
     if (!root) return;
     let apron = document.getElementById(APRON_ID);
-    if (!color || px <= 0) {
+    if (!surface || px <= 0) {
       if (apron) apron.remove();
       return;
     }
@@ -96,12 +113,19 @@ internal object PageBottomInset {
       apron.style.setProperty("bottom", "0", "important");
       apron.style.setProperty("pointer-events", "none", "important");
       apron.style.setProperty("z-index", "2147483646", "important");
+      apron.style.setProperty("transform", "translateZ(0)", "important");
       root.appendChild(apron);
     } else if (apron.parentNode !== root) {
       root.appendChild(apron);
     }
     apron.style.setProperty("height", (px + 1) + "px", "important");
-    apron.style.setProperty("background-color", color, "important");
+    apron.style.setProperty("background-color", surface.backgroundColor, "important");
+    if (surface.backdropFilter && state.blurEnabled) {
+      setBackdrop(apron, surface.backdropFilter);
+    } else {
+      apron.style.removeProperty("-webkit-backdrop-filter");
+      apron.style.removeProperty("backdrop-filter");
+    }
   };
 
   const ensureBlur = (px, apronActive) => {
@@ -112,8 +136,9 @@ internal object PageBottomInset {
       if (host) host.remove();
       return;
     }
-    const feather = Math.max(18, Math.round(px * 0.3));
+    const feather = Math.max(20, Math.round(px * 0.28));
     const totalHeight = px + feather;
+    const tint = pageTintColor();
     if (!host) {
       host = document.createElement("div");
       host.id = BLUR_ID;
@@ -127,9 +152,9 @@ internal object PageBottomInset {
       host.style.setProperty("overflow", "hidden", "important");
       host.style.setProperty("transform", "translateZ(0)", "important");
       const layers = [
-        { blur: "4px", mask: "linear-gradient(to bottom,transparent 0%,black 35%,black 100%)" },
-        { blur: "10px", mask: "linear-gradient(to bottom,transparent 20%,black 65%,black 100%)" },
-        { blur: "20px", mask: "linear-gradient(to bottom,transparent 42%,black 100%)" },
+        { blur: "12px", mask: "linear-gradient(to bottom,transparent 0%,black 32%,black 100%)" },
+        { blur: "28px", mask: "linear-gradient(to bottom,transparent 16%,black 58%,black 100%)" },
+        { blur: "48px saturate(1.25)", mask: "linear-gradient(to bottom,transparent 30%,black 85%,black 100%)" },
       ];
       for (const spec of layers) {
         const layer = document.createElement("div");
@@ -140,9 +165,19 @@ internal object PageBottomInset {
         setMask(layer, spec.mask);
         host.appendChild(layer);
       }
+      const scrim = document.createElement("div");
+      scrim.dataset.role = "tint";
+      scrim.style.setProperty("position", "absolute", "important");
+      scrim.style.setProperty("inset", "0", "important");
+      scrim.style.setProperty("pointer-events", "none", "important");
+      host.appendChild(scrim);
       root.appendChild(host);
     } else if (host.parentNode !== root) {
       root.appendChild(host);
+    }
+    const scrim = host.querySelector('[data-role="tint"]');
+    if (scrim) {
+      scrim.style.setProperty("background", "linear-gradient(to bottom,transparent 0%," + tint + " 42%," + tint + " 100%)", "important");
     }
     host.style.setProperty("height", totalHeight + "px", "important");
   };
@@ -245,7 +280,7 @@ internal object PageBottomInset {
     const candidates = collectFixedCandidates(px);
     const width = window.innerWidth;
     const height = window.innerHeight;
-    let apronColor = null;
+    let apronSurface = null;
     for (const el of candidates) {
       if (el.id === BLUR_ID || el.id === APRON_ID) continue;
       const existing = state.lifted.get(el);
@@ -295,11 +330,11 @@ internal object PageBottomInset {
         entry.shift = px;
         state.lifted.set(el, entry);
       }
-      if (!apronColor && baseBottom <= 8 && rect.width >= width * 0.9) {
-        apronColor = findBarBackground(el, width * 0.9);
+      if (!apronSurface && baseBottom <= 8 && rect.width >= width * 0.9) {
+        apronSurface = findBarSurface(el, width * 0.9);
       }
     }
-    return apronColor;
+    return apronSurface;
   };
 
   const applyAll = () => {
@@ -318,9 +353,9 @@ internal object PageBottomInset {
         }
       }
       applyBody(px);
-      const apronColor = applyFixed(px);
-      ensureApron(px, apronColor);
-      ensureBlur(px, Boolean(apronColor));
+      const apronSurface = applyFixed(px);
+      ensureApron(px, apronSurface);
+      ensureBlur(px, Boolean(apronSurface));
     } catch (_) {}
   };
 
