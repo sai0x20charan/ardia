@@ -11,7 +11,7 @@ import { usePreferences } from "../../state/settings/hooks";
 import { pageSwipe } from "../../state/settings/settingsRules";
 import { PageView, useTheme, type PageViewHandle } from "../ui";
 
-export function PageSurface({ tab, toneBottom, obscured, summaryBottomInset, topClearance, pinsSafeArea, testID }: { tab: BrowserTab; toneBottom: number; obscured?: { top: number; bottom: number }; summaryBottomInset?: number; topClearance?: number; pinsSafeArea?: boolean; testID?: string }) {
+export function PageSurface({ tab, toneBottom, obscured, bottomInsetTransitionMs, summaryBottomInset, topClearance, pinsSafeArea, testID }: { tab: BrowserTab; toneBottom: number; obscured?: { top: number; bottom: number }; bottomInsetTransitionMs?: number; summaryBottomInset?: number; topClearance?: number; pinsSafeArea?: boolean; testID?: string }) {
   const handle = useRef<PageViewHandle>(null);
   const theme = useTheme();
   const id = tab.id;
@@ -57,6 +57,7 @@ export function PageSurface({ tab, toneBottom, obscured, summaryBottomInset, top
       savedState={setup.saved}
       toneInsets={toneInsets}
       obscuredInsets={obscuredInsets}
+      bottomInsetTransitionMs={bottomInsetTransitionMs}
       summaryBottomInset={summaryBottomInset}
       obscuredColors={obscuredColors}
       topClearance={topClearance}

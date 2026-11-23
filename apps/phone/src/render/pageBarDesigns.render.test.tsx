@@ -110,13 +110,13 @@ test("a page loaded over plain http shows a red open lock in place of its icon, 
 
 const pageViewModule = require("@ardia/phone-native/src/PageView") as typeof import("@ardia/phone-native/src/PageView");
 
-test("in the redesign the page runs full screen under the bar, told the top safe area and, on iPhone, the bar's 75 points as obscured insets (none on Android, whose bar collapses by default), the status bar's strip is laid over the page in the page's top colour, nothing is painted between the page and the glass bar, and only the bar's pieces take touches", () => {
+test("the redesigned bar reserves Android viewport clearance and uses WebKit obscured insets on iPhone", () => {
   jest.spyOn(pageViewModule, "pageObscuresInsets").mockImplementation(() => true);
   const covered = Platform.OS === "android" ? 75 + 34 + 8 - 21.5 : 75;
   const root = page("redesigned");
   const view = root.root.findAll((node) => node.props.pageId !== undefined && node.props.obscuredInsets !== undefined)[0]!;
-  expect(view.props.obscuredInsets).toEqual({ top: 47, bottom: Platform.OS === "android" ? 0 : covered });
-  expect(view.props.toneInsets).toEqual({ top: 0, bottom: covered });
+  expect(view.props.obscuredInsets).toEqual({ top: 47, bottom: covered });
+  expect(view.props.toneInsets).toEqual({ top: 0, bottom: Platform.OS === "android" ? 0 : covered });
   expect(StyleSheet.flatten(host(root, "pageArea")!.props.style).marginBottom).toBe(0);
   const strip = StyleSheet.flatten(host(root, "pageStatusStrip")!.props.style);
   expect(strip).toMatchObject({ position: "absolute", top: 0, left: 0, right: 0, height: 47 });
@@ -142,7 +142,7 @@ test("the bands under the bars take the colours the bars use: the page's sampled
   unmount(toned);
 });
 
-test("on Android the page runs under a bar that collapses, so nothing resizes it while scrolling, and stops above one that doesn't; iPhone keeps SwiftUI's 75", () => {
+test("Android reserves clearance for the expanded bar and the collapsed pill while iPhone keeps its full inset", () => {
   jest.spyOn(pageViewModule, "pageObscuresInsets").mockImplementation(() => true);
   const android = Platform.OS === "android";
   const tab = currentTabs().open[0]!;
@@ -154,10 +154,19 @@ test("on Android the page runs under a bar that collapses, so nothing resizes it
   const lift = android ? 34 + 8 - 21.5 : 0;
   const root = page("redesigned", tab);
   expect(pageView(root).props.bottomInsetTransitionMs).toBeUndefined();
-  expect(bottom(root)).toBe(android ? 0 : 75);
+  expect(bottom(root)).toBe(75 + lift);
+  const fade = host(root, "pageBarFade");
+  expect(fade?.props.pointerEvents).toBe(android ? "none" : undefined);
   scrolled("down");
-  expect(bottom(root)).toBe(android ? 0 : 75);
+  if (android) {
+    expect(bottom(root)).toBeGreaterThan(34);
+    expect(bottom(root)).toBeLessThan(75 + lift);
+    expect(pageView(root).props.bottomInsetTransitionMs).toBe(300);
+  } else {
+    expect(bottom(root)).toBe(75);
+  }
   scrolled("up");
+  expect(bottom(root)).toBe(75 + lift);
   act(() => storeFullscreen(tab.id, true));
   expect(bottom(root)).toBe(android ? 0 : 75);
   act(() => storeFullscreen(tab.id, false));

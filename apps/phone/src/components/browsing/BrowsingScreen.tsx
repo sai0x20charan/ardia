@@ -3,6 +3,7 @@ import { countRender } from "../../state/app/interactionPerf";
 import { Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BAR_SHOWN, barShown, bottomBarCollapses, followScroll, obscuredBottom, pageInsets } from "../../lib/barCollapse";
 import type { Design } from "../../lib/design";
@@ -147,11 +148,25 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
   const folds = squeeze === null;
   const staged = design === "redesigned" && searchStageIsNative();
   useEffect(() => (staged && !collapse.hidden ? reportBarPill() : undefined), [staged, collapse.hidden]);
-  const layout = underBar ? { pageBottom: 0, toneBottom: design === "material" ? 0 : barSlotHeight } : pageInsets(collapse.collapses, barSlotHeight, browseLayout.pageOverlap);
   const fullscreen = usePages((s) => s.fullscreen[tab.id] ?? false);
-  const coveredBottom = obscuredBottom({ insetsScroll: Platform.OS === "ios", bar: barSlotHeight, collapses: collapse.collapses, cleared: fullscreen || finding || searching });
+  const android = Platform.OS === "android";
+  const barCleared = fullscreen || finding || searching;
+  const barCenter = barCenterFromBottom(insets.bottom, design);
+  const materialPillBottom = insets.bottom + materialBottomBar.inset + materialBarPill.height;
+  const floatingPillBottom = barCenter - floatingBarLayout.control / 2 + hostPillLayout.height;
+  const collapsedBarBottom = design === "material" ? materialPillBottom : floatingPillBottom;
+  let androidBarBottom = barSlotHeight;
+  if (barCleared) androidBarBottom = 0;
+  else if (collapse.hidden) androidBarBottom = insets.bottom;
+  else if (collapse.collapsed && folds) androidBarBottom = collapsedBarBottom;
+  const layout = underBar ? { pageBottom: 0, toneBottom: android || design === "material" ? 0 : barSlotHeight }
+    : android ? { pageBottom: androidBarBottom, toneBottom: 0 }
+    : pageInsets(collapse.collapses, barSlotHeight, browseLayout.pageOverlap);
+  const coveredBottom = android ? androidBarBottom : obscuredBottom({ insetsScroll: true, bar: barSlotHeight, collapses: collapse.collapses, cleared: barCleared });
   const obscured = underBar ? { top: insets.top, bottom: coveredBottom } : undefined;
-  const materialSummaryBottom = fullscreen || searching ? insets.bottom : collapse.collapsed ? insets.bottom + materialBottomBar.inset + materialBarPill.height : barSlotHeight;
+  const reduceMotion = useReduceMotion();
+  const bottomInsetTransitionMs = android && underBar && collapse.collapsed && !reduceMotion && !barCleared ? 300 : undefined;
+  const materialSummaryBottom = fullscreen || searching ? insets.bottom : collapse.collapsed ? materialPillBottom : barSlotHeight;
   const summaryBottomInset = design === "material" ? materialSummaryBottom : undefined;
   const painted = useSharedValue(false);
   useEffect(() => {
@@ -168,7 +183,6 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
     if (id) switchToNeighbour(id);
   }, []);
   const incognito = useIncognito();
-  const reduceMotion = useReduceMotion();
   const pulls = design === "redesigned";
   const tracks = pulls && !reduceMotion;
   useEffect(() => {
@@ -176,7 +190,6 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
     armDeckPull(tab.id, reduceMotion);
     return () => disarmDeckPull(tab.id, deckPullSettled);
   }, [pulls, reduceMotion, tab.id]);
-  const barCenter = barCenterFromBottom(insets.bottom, design);
   const barTop = barCenter + floatingBarLayout.control / 2;
   const barShift = usePullBarShift(barTop, barCenter - redesignedBarCenterFromBottom(insets.bottom, Platform.OS));
   const swipesUp = !searching && !collapse.hidden && !(pulls && collapse.collapsed);
@@ -222,9 +235,22 @@ const BrowsingPage = memo(function BrowsingPage({ tab }: { tab: BrowserTab }) {
         <Animated.View style={[StyleSheet.absoluteFill, styles.outgoing, { backgroundColor: theme.canvas }, pager.outgoing]}>
           {underBar ? null : <Animated.View testID="pageStatusStrip" style={[{ height: insets.top }, statusStyle]} />}
           <View testID="pageArea" style={[styles.page, { marginBottom: layout.pageBottom }]}>
-            <PageSurface key={tab.id} tab={tab} toneBottom={layout.toneBottom} obscured={obscured} summaryBottomInset={summaryBottomInset} pinsSafeArea={pulls ? true : undefined} />
+            <PageSurface key={tab.id} tab={tab} toneBottom={layout.toneBottom} obscured={obscured} bottomInsetTransitionMs={bottomInsetTransitionMs} summaryBottomInset={summaryBottomInset} pinsSafeArea={pulls ? true : undefined} />
             <PageCover key={`${tab.id}:cover`} tab={tab} />
             <PageFailureView key={`${tab.id}:failure`} tabId={tab.id} />
+            {android && androidBarBottom > 0 && !collapse.collapsed && !collapse.hidden ? (
+              <View testID="pageBarFade" pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, bottom: underBar ? coveredBottom : 0, height: space.xs }}>
+                <Svg width="100%" height="100%">
+                  <Defs>
+                    <LinearGradient id="pageBarFade" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <Stop offset="0%" stopColor={bottom} stopOpacity={0} />
+                      <Stop offset="100%" stopColor={bottom} />
+                    </LinearGradient>
+                  </Defs>
+                  <Rect width="100%" height="100%" fill="url(#pageBarFade)" />
+                </Svg>
+              </View>
+            ) : null}
           </View>
           {underBar ? <Animated.View testID="pageStatusStrip" pointerEvents="none" style={[styles.statusOver, { height: insets.top }, statusStyle]} /> : null}
           <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: tabsInk.pagerBlack }, pager.dim]} pointerEvents="none" />

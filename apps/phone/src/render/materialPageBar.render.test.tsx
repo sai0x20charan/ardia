@@ -83,7 +83,7 @@ onAndroid("the material page bar has a rounded capsule with tabs, centered searc
   expect(node(root, "materialBarBand")).toBeUndefined();
   expect(flat(node(root, "pageArea")).marginBottom).toBe(0);
   const pageView = root.root.findAll((found) => found.props.pageId !== undefined && found.props.obscuredInsets !== undefined)[0]!;
-  expect(pageView.props.obscuredInsets.bottom).toBe(0);
+  expect(pageView.props.obscuredInsets.bottom).toBe(barHeight(24, "material"));
   expect(pageView.props.summaryBottomInset).toBe(barHeight(24, "material"));
   expect(pageView.props.toneInsets).toEqual({ top: 0, bottom: 0 });
   expect(node(root, "pageBar")!.props.pointerEvents).toBe("box-none");
@@ -414,6 +414,7 @@ onAndroid("scrolling a page down folds the Material bottom bar into a host pill 
   expect(flat(node(root, "materialBarPillPlace"))).toMatchObject({ height: 60, paddingVertical: 12 });
   expect(pageView().props.summaryBottomInset).toBeGreaterThan(0);
   expect(pageView().props.summaryBottomInset).toBeLessThan(expandedSummaryInset);
+  expect(pageView().props.obscuredInsets.bottom).toBe(pageView().props.summaryBottomInset);
   scrolled("up");
   settle();
   expect(node(root, "materialBarFold")!).toHaveAnimatedStyle({ opacity: 1 });
