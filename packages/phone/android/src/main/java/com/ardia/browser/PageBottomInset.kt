@@ -71,13 +71,13 @@ internal object PageBottomInset {
     const chosen = bodyBg && bodyBg.a > 0.1 ? bodyBg : rootBg && rootBg.a > 0.1 ? rootBg : null;
     if (chosen) {
       const luma = (0.299 * chosen.r + 0.587 * chosen.g + 0.114 * chosen.b) / 255;
-      if (luma < 0.45) return { mid: "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.42)", bottom: "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.54)" };
-      return { mid: "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.44)", bottom: "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.58)" };
+      if (luma < 0.45) return { mid: "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.24)", bottom: "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.34)" };
+      return { mid: "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.26)", bottom: "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.38)" };
     }
     const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
     return dark
-      ? { mid: "rgba(18,18,22,0.42)", bottom: "rgba(18,18,22,0.54)" }
-      : { mid: "rgba(255,255,255,0.44)", bottom: "rgba(255,255,255,0.58)" };
+      ? { mid: "rgba(18,18,22,0.24)", bottom: "rgba(18,18,22,0.34)" }
+      : { mid: "rgba(255,255,255,0.26)", bottom: "rgba(255,255,255,0.38)" };
   };
 
   const findBarSurface = (el, minWidth) => {
@@ -160,10 +160,10 @@ internal object PageBottomInset {
       host.style.setProperty("overflow", "hidden", "important");
       host.style.setProperty("transform", "translateZ(0)", "important");
       const layers = [
-        { filter: "blur(2px) saturate(1.15)", mask: "linear-gradient(to bottom,transparent 0%,black 12%,black 24%,transparent 36%)" },
-        { filter: "blur(6px) saturate(1.3)", mask: "linear-gradient(to bottom,transparent 8%,black 20%,black 32%,transparent 44%)" },
-        { filter: "blur(14px) saturate(1.5)", mask: "linear-gradient(to bottom,transparent 16%,black 28%,black 42%,transparent 54%)" },
-        { filter: "blur(32px) saturate(1.8)", mask: "linear-gradient(to bottom,transparent 22%,black 40%,black 100%)" },
+        { filter: "blur(1.5px) saturate(1.1)", mask: "linear-gradient(to bottom,transparent 0%,black 12%,black 24%,transparent 36%)" },
+        { filter: "blur(4px) saturate(1.2)", mask: "linear-gradient(to bottom,transparent 8%,black 20%,black 32%,transparent 44%)" },
+        { filter: "blur(8px) saturate(1.3)", mask: "linear-gradient(to bottom,transparent 16%,black 28%,black 42%,transparent 54%)" },
+        { filter: "blur(16px) saturate(1.45)", mask: "linear-gradient(to bottom,transparent 22%,black 40%,black 100%)" },
       ];
       for (const spec of layers) {
         const layer = document.createElement("div");
