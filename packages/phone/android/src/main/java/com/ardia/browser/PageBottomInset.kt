@@ -65,19 +65,25 @@ internal object PageBottomInset {
     return { r: Math.round(r), g: Math.round(g), b: Math.round(b), a };
   };
 
-  const pageGlassTint = () => {
+  const pageGlassLook = () => {
     const bodyBg = document.body ? parseRgba(getComputedStyle(document.body).backgroundColor) : null;
     const rootBg = document.documentElement ? parseRgba(getComputedStyle(document.documentElement).backgroundColor) : null;
     const chosen = bodyBg && bodyBg.a > 0.1 ? bodyBg : rootBg && rootBg.a > 0.1 ? rootBg : null;
+    let isDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
     if (chosen) {
       const luma = (0.299 * chosen.r + 0.587 * chosen.g + 0.114 * chosen.b) / 255;
-      if (luma < 0.45) return { mid: "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.24)", bottom: "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.34)" };
-      return { mid: "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.26)", bottom: "rgba(" + chosen.r + "," + chosen.g + "," + chosen.b + ",0.38)" };
+      isDark = luma < 0.45;
     }
-    const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    return dark
-      ? { mid: "rgba(18,18,22,0.24)", bottom: "rgba(18,18,22,0.34)" }
-      : { mid: "rgba(255,255,255,0.26)", bottom: "rgba(255,255,255,0.38)" };
+    if (isDark) {
+      return {
+        filter: "blur(20px) saturate(1.85) contrast(1.08) brightness(0.94)",
+        glaze: "linear-gradient(to bottom,transparent 0%,rgba(255,255,255,0.09) 20%,rgba(18,20,24,0.30) 44%,rgba(18,20,24,0.46) 100%)",
+      };
+    }
+    return {
+      filter: "blur(20px) saturate(1.9) contrast(1.06) brightness(1.04)",
+      glaze: "linear-gradient(to bottom,transparent 0%,rgba(255,255,255,0.38) 20%,rgba(255,255,255,0.22) 44%,rgba(255,255,255,0.38) 100%)",
+    };
   };
 
   const findBarSurface = (el, minWidth) => {
@@ -144,9 +150,9 @@ internal object PageBottomInset {
       if (host) host.remove();
       return;
     }
-    const feather = Math.max(14, Math.round(px * 0.2));
+    const feather = Math.max(10, Math.round(px * 0.14));
     const totalHeight = px + feather;
-    const tint = pageGlassTint();
+    const look = pageGlassLook();
     if (!host) {
       host = document.createElement("div");
       host.id = BLUR_ID;
@@ -159,35 +165,34 @@ internal object PageBottomInset {
       host.style.setProperty("z-index", "2147483647", "important");
       host.style.setProperty("overflow", "hidden", "important");
       host.style.setProperty("transform", "translateZ(0)", "important");
-      const layers = [
-        { filter: "blur(1.5px) saturate(1.1)", mask: "linear-gradient(to bottom,transparent 0%,black 12%,black 24%,transparent 36%)" },
-        { filter: "blur(4px) saturate(1.2)", mask: "linear-gradient(to bottom,transparent 8%,black 20%,black 32%,transparent 44%)" },
-        { filter: "blur(8px) saturate(1.3)", mask: "linear-gradient(to bottom,transparent 16%,black 28%,black 42%,transparent 54%)" },
-        { filter: "blur(16px) saturate(1.45)", mask: "linear-gradient(to bottom,transparent 22%,black 40%,black 100%)" },
-      ];
-      for (const spec of layers) {
-        const layer = document.createElement("div");
-        layer.style.setProperty("position", "absolute", "important");
-        layer.style.setProperty("inset", "0", "important");
-        layer.style.setProperty("pointer-events", "none", "important");
-        setBackdrop(layer, spec.filter);
-        setMask(layer, spec.mask);
-        host.appendChild(layer);
-      }
-      const scrim = document.createElement("div");
-      scrim.dataset.role = "glassTint";
-      scrim.style.setProperty("position", "absolute", "important");
-      scrim.style.setProperty("inset", "0", "important");
-      scrim.style.setProperty("pointer-events", "none", "important");
-      host.appendChild(scrim);
+      const edge = document.createElement("div");
+      edge.style.setProperty("position", "absolute", "important");
+      edge.style.setProperty("inset", "0", "important");
+      edge.style.setProperty("pointer-events", "none", "important");
+      setBackdrop(edge, "blur(6px) saturate(1.4)");
+      setMask(edge, "linear-gradient(to bottom,transparent 0%,black 12%,black 22%,transparent 32%)");
+      host.appendChild(edge);
+      const pane = document.createElement("div");
+      pane.dataset.role = "glassPane";
+      pane.style.setProperty("position", "absolute", "important");
+      pane.style.setProperty("inset", "0", "important");
+      pane.style.setProperty("pointer-events", "none", "important");
+      setMask(pane, "linear-gradient(to bottom,transparent 10%,black 26%,black 100%)");
+      host.appendChild(pane);
+      const glaze = document.createElement("div");
+      glaze.dataset.role = "glassGlaze";
+      glaze.style.setProperty("position", "absolute", "important");
+      glaze.style.setProperty("inset", "0", "important");
+      glaze.style.setProperty("pointer-events", "none", "important");
+      host.appendChild(glaze);
       root.appendChild(host);
     } else if (host.parentNode !== root) {
       root.appendChild(host);
     }
-    const scrim = host.querySelector('[data-role="glassTint"]');
-    if (scrim) {
-      scrim.style.setProperty("background", "linear-gradient(to bottom,transparent 14%," + tint.mid + " 42%," + tint.bottom + " 100%)", "important");
-    }
+    const pane = host.querySelector('[data-role="glassPane"]');
+    if (pane) setBackdrop(pane, look.filter);
+    const glaze = host.querySelector('[data-role="glassGlaze"]');
+    if (glaze) glaze.style.setProperty("background", look.glaze, "important");
     host.style.setProperty("transition", animate ? "height 260ms cubic-bezier(0.2,0,0,1)" : "none", "important");
     host.style.setProperty("height", totalHeight + "px", "important");
   };
